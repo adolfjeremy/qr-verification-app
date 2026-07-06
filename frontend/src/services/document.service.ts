@@ -2,8 +2,8 @@ import type { DraggableItem } from "../components/DraggableOverlay";
 
 export const signDocument = async (file: File, items: DraggableItem[]) => {
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('items', JSON.stringify(items));
+  formData.append('document', file);
+  formData.append('signData', JSON.stringify({ items }));
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -19,9 +19,10 @@ export const signDocument = async (file: File, items: DraggableItem[]) => {
   return response.blob();
 };
 
-export const saveDocumentToServer = async (file: File, documentId: string) => {
+export const saveDocumentToServer = async (file: File, items: DraggableItem[], documentId: string) => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('document', file);
+  formData.append('signData', JSON.stringify({ items }));
   formData.append('documentId', documentId);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';

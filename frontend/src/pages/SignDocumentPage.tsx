@@ -93,7 +93,7 @@ export default function SignDocumentPage() {
     try {
       setIsProcessing(true);
 
-      await saveDocumentToServer(file, documentId);
+      await saveDocumentToServer(file, items, documentId);
       setIsSaved(true);
       alert('Document saved successfully!');
     } catch (error) {
