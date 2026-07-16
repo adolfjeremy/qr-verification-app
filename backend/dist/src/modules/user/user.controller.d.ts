@@ -5,15 +5,15 @@ export declare class UserController {
     constructor(prismaService: PrismaService);
     getSavedSignatures(req: Request): Promise<{
         id: string;
+        createdAt: Date;
         userId: string;
         signatureBase64: string;
-        createdAt: Date;
     }[]>;
     saveSignature(req: Request, signatureBase64: string): Promise<{
         id: string;
+        createdAt: Date;
         userId: string;
         signatureBase64: string;
-        createdAt: Date;
     }>;
     deleteSignature(req: Request, id: string): Promise<{
         message: string;

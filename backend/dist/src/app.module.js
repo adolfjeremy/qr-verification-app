@@ -15,6 +15,9 @@ const prisma_module_1 = require("./modules/prisma/prisma.module");
 const storage_module_1 = require("./modules/storage/storage.module");
 const auth_module_1 = require("./modules/auth/auth.module");
 const user_module_1 = require("./modules/user/user.module");
+const email_module_1 = require("./modules/email/email.module");
+const crypto_module_1 = require("./modules/crypto/crypto.module");
+const audit_module_1 = require("./modules/audit/audit.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -27,7 +30,10 @@ exports.AppModule = AppModule = __decorate([
             prisma_module_1.PrismaModule,
             storage_module_1.StorageModule,
             auth_module_1.AuthModule,
-            user_module_1.UserModule
+            user_module_1.UserModule,
+            email_module_1.EmailModule,
+            crypto_module_1.CryptoModule,
+            audit_module_1.AuditModule,
         ],
         controllers: [],
         providers: [],

@@ -3,6 +3,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { X, Eraser, Check, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
+import toast from 'react-hot-toast';
 
 interface SignaturePadProps {
   onSave: (base64: string) => void;
@@ -61,13 +62,24 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
 
   const handleDeleteSaved = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Delete this saved signature?')) return;
-    try {
-      await api.delete(`/users/signatures/${id}`);
-      setSavedSignatures(savedSignatures.filter(s => s.id !== id));
-    } catch(err) {
-      console.error('Failed to delete signature');
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <span className="text-sm font-medium">Delete this saved signature?</span>
+        <div className="flex gap-2 justify-end">
+          <button autoFocus onClick={() => toast.dismiss(t.id)} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm text-slate-700 transition-colors">Cancel</button>
+          <button onClick={async () => {
+            toast.dismiss(t.id);
+            try {
+              await api.delete(`/users/signatures/${id}`);
+              setSavedSignatures(prev => prev.filter(s => s.id !== id));
+              toast.success('Signature deleted');
+            } catch(err) {
+              toast.error('Failed to delete signature');
+            }
+          }} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">Delete</button>
+        </div>
+      </div>
+    ), { duration: 5000, position: 'top-center' });
   };
 
   return (

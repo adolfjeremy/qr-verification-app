@@ -6,7 +6,7 @@ import logoVerified from '../assets/logo-verified.png';
 
 export interface DraggableItem {
   id: string;
-  type: 'signature' | 'qrcode_doc' | 'qrcode_verify';
+  type: 'signature' | 'qrcode_doc' | 'qrcode_verify' | 'signature_request';
   base64Image?: string;
   qrContent?: string;
   x: number;
@@ -14,6 +14,8 @@ export interface DraggableItem {
   width: number;
   height: number;
   pageNumber: number;
+  signerEmail?: string;
+  signerName?: string;
 }
 
 interface DraggableOverlayProps {
@@ -86,6 +88,13 @@ export const DraggableOverlay: React.FC<DraggableOverlayProps> = ({ item, onChan
               excavate: true,
             }}
           />
+        </div>
+      )}
+
+      {item.type === 'signature_request' && (
+        <div className="border-2 border-dashed border-blue-400 bg-blue-50/50 flex flex-col items-center justify-center p-2 rounded w-full h-full text-blue-700 pointer-events-none">
+          <span className="text-xs font-bold uppercase tracking-wide">Sign Here</span>
+          <span className="text-[10px] truncate max-w-full">{item.signerName || 'Remote Signer'}</span>
         </div>
       )}
     </Rnd>

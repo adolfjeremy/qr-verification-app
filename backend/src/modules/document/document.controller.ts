@@ -3,6 +3,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentService } from './document.service';
 import { StorageService } from '../storage/storage.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
+import { CryptoService } from '../crypto/crypto.service';
+import { AuditService } from '../audit/audit.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Response, Request } from 'express';
 import * as crypto from 'crypto';
@@ -13,6 +16,9 @@ export class DocumentController {
     private readonly documentService: DocumentService,
     private readonly storageService: StorageService,
     private readonly prismaService: PrismaService,
+    private readonly emailService: EmailService,
+    private readonly cryptoService: CryptoService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Get()
@@ -20,7 +26,7 @@ export class DocumentController {
   async getUserDocuments(@Req() req: Request) {
     const user = req.user as any;
     return this.prismaService.document.findMany({
-      where: { uploaderId: user.id },
+      where: { uploaderId: user.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -55,15 +61,27 @@ export class DocumentController {
       
       const fileBuffer = await this.storageService.getFileBuffer(document.fileUrl);
       
-      const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, signData.items);
+      const pdfBuffer = await this.documentService.processDocument(fileBuffer, signData.items);
       
-      // overwrite the file on disk with the signed version
+      // Apply PKI Cryptographic Digital Signature
+      const signedPdfBuffer = await this.cryptoService.signPdf(pdfBuffer);
+      
+      // overwrite the file on disk with the crypto-signed version
       await this.storageService.uploadFile(document.fileUrl, signedPdfBuffer);
       
       await this.prismaService.document.update({
           where: { id: documentId },
-          data: { status: 'SIGNED', items: signData.items || [] }
+          data: { status: 'PUBLISHED', items: signData.items || [] } // Ensure status becomes PUBLISHED
       });
+
+      await this.auditService.logAction(
+        document.id,
+        'PUBLISHED',
+        user.id,
+        req.ip,
+        req.headers['user-agent'],
+        'Document was digitally signed (PKI) and published.'
+      );
 
       return { message: 'Document published successfully' };
     } catch (error) {
@@ -123,6 +141,15 @@ export class DocumentController {
         }
       });
       
+      await this.auditService.logAction(
+        id,
+        'UPLOADED',
+        user.id,
+        req.ip,
+        req.headers['user-agent'],
+        'Document was uploaded.'
+      );
+
       return { id: document.id };
     } catch (error) {
       throw new BadRequestException(`Failed to create draft: ${error.message}`);
@@ -135,7 +162,7 @@ export class DocumentController {
     const user = req.user as any;
     const document = await this.prismaService.document.findUnique({ where: { id } });
     
-    if (!document) throw new BadRequestException('Document not found');
+    if (!document || document.deletedAt) throw new BadRequestException('Document not found');
     if (document.uploaderId !== user.id) throw new BadRequestException('Unauthorized access to document');
     
     const API_URL = process.env.API_URL || 'http://localhost:3000';
@@ -224,6 +251,164 @@ export class DocumentController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post(':id/request-signature')
+  async requestSignature(
+    @Param('id') id: string,
+    @Body('email') email: string,
+    @Body('name') name: string,
+    @Body('coordinateData') coordinateDataStr: string,
+    @Req() req: Request
+  ) {
+    if (!email || !name || !coordinateDataStr) {
+      throw new BadRequestException('email, name, and coordinateData are required.');
+    }
+
+    let coordinateData;
+    try {
+      coordinateData = JSON.parse(coordinateDataStr);
+    } catch (e) {
+      throw new BadRequestException('Invalid JSON in coordinateData.');
+    }
+
+    const user = req.user as any;
+    const document = await this.prismaService.document.findUnique({ where: { id } });
+
+    if (!document) throw new BadRequestException('Document not found');
+    if (document.uploaderId !== user.id) throw new BadRequestException('Unauthorized');
+
+    const token = crypto.randomUUID();
+
+    await this.prismaService.signatureRequest.create({
+      data: {
+        documentId: id,
+        email,
+        name,
+        token,
+        coordinateData,
+      }
+    });
+    
+    // Update document status
+    await this.prismaService.document.update({
+      where: { id },
+      data: { status: 'PENDING_SIGNATURE' }
+    });
+
+    const APP_URL = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const signLink = `${APP_URL}/sign-request/${token}`;
+
+    await this.emailService.sendSignatureRequest(email, name, document.title, signLink);
+
+    await this.auditService.logAction(
+      id,
+      'SIGNATURE_REQUESTED',
+      user.id,
+      req.ip,
+      req.headers['user-agent'],
+      `Requested signature from ${email} (${name})`
+    );
+
+    return { message: 'Signature request sent successfully' };
+  }
+
+  // Public endpoint for getting document data using a signature request token
+  @Get('request/:token')
+  async getSignatureRequest(@Param('token') token: string) {
+    const request = await this.prismaService.signatureRequest.findUnique({
+      where: { token },
+      include: { document: true }
+    });
+
+    if (!request) throw new BadRequestException('Invalid or expired request link');
+    if (request.status === 'COMPLETED') throw new BadRequestException('This document has already been signed');
+
+    const API_URL = process.env.API_URL || 'http://localhost:3000';
+    return {
+      id: request.id,
+      documentId: request.documentId,
+      documentTitle: request.document.title,
+      signerEmail: request.email,
+      signerName: request.name,
+      coordinateData: request.coordinateData,
+      fileViewUrl: `${API_URL}/api/documents/${request.documentId}/view`,
+    };
+  }
+
+  // Public endpoint for submitting a remote signature
+  @Post('request/:token/sign')
+  async submitRemoteSignature(
+    @Param('token') token: string,
+    @Body('signatureBase64') signatureBase64: string,
+    @Req() req: Request
+  ) {
+    if (!signatureBase64) throw new BadRequestException('signatureBase64 is required');
+
+    const request = await this.prismaService.signatureRequest.findUnique({
+      where: { token },
+      include: { document: true }
+    });
+
+    if (!request) throw new BadRequestException('Invalid or expired request link');
+    if (request.status === 'COMPLETED') throw new BadRequestException('This document has already been signed');
+
+    const documentId = request.documentId;
+    
+    // Convert the single signature placeholder into an item format that processDocument expects
+    const coords: any = request.coordinateData;
+    const itemsToSign = [
+      {
+        type: 'signature',
+        pageNumber: coords.pageNumber,
+        x: coords.x,
+        y: coords.y,
+        width: coords.width,
+        height: coords.height,
+        base64Image: signatureBase64,
+      }
+    ];
+
+    // Combine with any existing items (like QR codes already placed by the owner)
+    let existingItems = [];
+    if (request.document.items) {
+      if (typeof request.document.items === 'string') {
+        try { existingItems = JSON.parse(request.document.items); } catch(e) {}
+      } else if (Array.isArray(request.document.items)) {
+        existingItems = request.document.items;
+      }
+    }
+    
+    const combinedItems = [...existingItems, ...itemsToSign];
+
+    const fileBuffer = await this.storageService.getFileBuffer(request.document.fileUrl);
+    const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, combinedItems);
+    
+    await this.storageService.uploadFile(request.document.fileUrl, signedPdfBuffer);
+
+    // Mark request as completed
+    await this.prismaService.signatureRequest.update({
+      where: { id: request.id },
+      data: { status: 'COMPLETED', completedAt: new Date() }
+    });
+
+    // Update document
+    await this.prismaService.document.update({
+      where: { id: documentId },
+      data: { status: 'SIGNED', items: combinedItems }
+    });
+
+    await this.auditService.logAction(
+      documentId,
+      'SIGNED',
+      null, // Remote signers might not have a user ID
+      req.ip,
+      req.headers['user-agent'],
+      `Document signed by ${request.name} (${request.email}) via remote request.`
+    );
+
+    return { message: 'Document signed successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async deleteDocument(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as any;
@@ -232,7 +417,7 @@ export class DocumentController {
       where: { id },
     });
 
-    if (!document) {
+    if (!document || document.deletedAt) {
       throw new BadRequestException('Document not found');
     }
 
@@ -241,16 +426,23 @@ export class DocumentController {
     }
 
     try {
-      // Clean up related records to prevent foreign key constraint failures
-      await this.prismaService.signature.deleteMany({ where: { documentId: id } });
-      await this.prismaService.verification.deleteMany({ where: { documentId: id } });
-      
-      // Delete the database record
-      await this.prismaService.document.delete({
+      // Soft Delete the database record
+      await this.prismaService.document.update({
         where: { id },
+        data: { deletedAt: new Date() },
       });
 
-      // Delete the actual file
+      // Audit Log for the DELETED action
+      await this.auditService.logAction(
+        id,
+        'DELETED',
+        user.id,
+        req.ip,
+        req.headers['user-agent'],
+        'Document was permanently deleted by user.'
+      );
+
+      // Delete the actual file to save local storage space
       await this.storageService.deleteFile(document.fileUrl);
 
       return { message: 'Document deleted successfully' };

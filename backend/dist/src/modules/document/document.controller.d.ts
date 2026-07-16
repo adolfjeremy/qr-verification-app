@@ -1,12 +1,18 @@
 import { DocumentService } from './document.service';
 import { StorageService } from '../storage/storage.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
+import { CryptoService } from '../crypto/crypto.service';
+import { AuditService } from '../audit/audit.service';
 import { Response, Request } from 'express';
 export declare class DocumentController {
     private readonly documentService;
     private readonly storageService;
     private readonly prismaService;
-    constructor(documentService: DocumentService, storageService: StorageService, prismaService: PrismaService);
+    private readonly emailService;
+    private readonly cryptoService;
+    private readonly auditService;
+    constructor(documentService: DocumentService, storageService: StorageService, prismaService: PrismaService, emailService: EmailService, cryptoService: CryptoService, auditService: AuditService);
     getUserDocuments(req: Request): Promise<{
         id: string;
         title: string;
@@ -29,6 +35,7 @@ export declare class DocumentController {
         items: import("@prisma/client/runtime/client").JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
+        deletedAt: Date | null;
         uploaderId: string;
     }>;
     saveDocumentDraft(signDataStr: string, documentId: string, req: Request): Promise<{
@@ -42,6 +49,21 @@ export declare class DocumentController {
         signedDate: Date;
         uploader: string;
         uploaderName: string;
+    }>;
+    requestSignature(id: string, email: string, name: string, coordinateDataStr: string, req: Request): Promise<{
+        message: string;
+    }>;
+    getSignatureRequest(token: string): Promise<{
+        id: string;
+        documentId: string;
+        documentTitle: string;
+        signerEmail: string;
+        signerName: string;
+        coordinateData: import("@prisma/client/runtime/client").JsonValue;
+        fileViewUrl: string;
+    }>;
+    submitRemoteSignature(token: string, signatureBase64: string, req: Request): Promise<{
+        message: string;
     }>;
     deleteDocument(id: string, req: Request): Promise<{
         message: string;

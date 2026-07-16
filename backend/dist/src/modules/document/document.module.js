@@ -11,12 +11,16 @@ const common_1 = require("@nestjs/common");
 const document_controller_1 = require("./document.controller");
 const document_service_1 = require("./document.service");
 const qr_module_1 = require("../qr/qr.module");
+const prisma_module_1 = require("../prisma/prisma.module");
+const email_module_1 = require("../email/email.module");
+const crypto_module_1 = require("../crypto/crypto.module");
+const audit_module_1 = require("../audit/audit.module");
 let DocumentModule = class DocumentModule {
 };
 exports.DocumentModule = DocumentModule;
 exports.DocumentModule = DocumentModule = __decorate([
     (0, common_1.Module)({
-        imports: [qr_module_1.QrModule],
+        imports: [qr_module_1.QrModule, prisma_module_1.PrismaModule, email_module_1.EmailModule, crypto_module_1.CryptoModule, audit_module_1.AuditModule],
         controllers: [document_controller_1.DocumentController],
         providers: [document_service_1.DocumentService],
     })

@@ -5,8 +5,10 @@ import { PdfViewer } from '../components/PdfViewer';
 import { SignaturePad } from '../components/SignaturePad';
 import { DraggableOverlay, type DraggableItem } from '../components/DraggableOverlay';
 import { publishDocument, exportDocument, saveDocumentToServer, createDraftDocument } from '../services/document.service';
-import { FileSignature, QrCode, Download, Loader2, Save, Send, Home } from 'lucide-react';
+import { FileSignature, QrCode, Download, Loader2, Save, Send, Mail } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../lib/api';
+import logoApp from '../assets/logo.webp';
 
 export default function SignDocumentPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,13 +16,18 @@ export default function SignDocumentPage() {
 
   const [documentId, setDocumentId] = useState<string>('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  
+  const [documentStatus, setDocumentStatus] = useState<string>('DRAFT');
+
   const [isSaved, setIsSaved] = useState(false);
   const [items, setItems] = useState<DraggableItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestEmail, setRequestEmail] = useState('');
+  const [requestName, setRequestName] = useState('');
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Ref for the container to maintain relative positioning bounds
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -30,17 +37,19 @@ export default function SignDocumentPage() {
       api.get(`/documents/${id}`).then(res => {
         setDocumentId(id);
         setPdfUrl(res.data.fileViewUrl);
-        
+
         // Handle legacy items format just in case, but usually it's an array
         let parsedItems = res.data.items;
         if (typeof parsedItems === 'string') {
-          try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+          try { parsedItems = JSON.parse(parsedItems); } catch (e) { parsedItems = []; }
         }
         setItems(parsedItems || []);
-        
-        setIsSaved(res.data.status === 'SIGNED');
+        setItems(parsedItems || []);
+
+        setDocumentStatus(res.data.status);
+        setIsSaved(res.data.status === 'PUBLISHED');
       }).catch(() => {
-        alert('Document not found or unauthorized');
+        toast.error('Document not found or unauthorized');
         navigate('/dashboard');
       }).finally(() => {
         setIsProcessing(false);
@@ -58,7 +67,7 @@ export default function SignDocumentPage() {
       navigate(`/sign/${res.id}`);
     } catch (error) {
       console.error('Error creating draft', error);
-      alert('Failed to upload document');
+      toast.error('Failed to upload document');
     } finally {
       setIsProcessing(false);
     }
@@ -115,6 +124,34 @@ export default function SignDocumentPage() {
     ]);
   };
 
+  const handleAddRequestSignature = () => {
+    setShowRequestModal(true);
+  };
+
+  const submitRequestSignatureModal = () => {
+    if (!requestEmail || !requestName) {
+      toast.error('Email and Name are required');
+      return;
+    }
+    setItems([
+      ...items,
+      {
+        id: `request-${Date.now()}`,
+        type: 'signature_request',
+        signerEmail: requestEmail,
+        signerName: requestName,
+        x: 50,
+        y: 50,
+        width: 150,
+        height: 60,
+        pageNumber: currentPage,
+      },
+    ]);
+    setShowRequestModal(false);
+    setRequestEmail('');
+    setRequestName('');
+  };
+
   const handleUpdateItem = (id: string, updates: Partial<DraggableItem>) => {
     setItems(items.map(item => item.id === id ? { ...item, ...updates } : item));
   };
@@ -128,10 +165,10 @@ export default function SignDocumentPage() {
     try {
       setIsProcessing(true);
       await saveDocumentToServer(items, documentId);
-      alert('Draft saved successfully!');
+      toast.success('Draft saved successfully!');
     } catch (error) {
       console.error('Error saving document', error);
-      alert('Failed to save document. Please check console for details.');
+      toast.error('Failed to save document. Please check console for details.');
     } finally {
       setIsProcessing(false);
     }
@@ -143,10 +180,41 @@ export default function SignDocumentPage() {
       setIsProcessing(true);
       await publishDocument(items, documentId);
       setIsSaved(true);
-      alert('Document published successfully!');
+      toast.success('Document published successfully!');
     } catch (error) {
       console.error('Error publishing document', error);
-      alert('Failed to publish document. Please check console for details.');
+      toast.error('Failed to publish document. Please check console for details.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSendSignatureRequest = async () => {
+    if (!documentId) return;
+    const requestItem = items.find(item => item.type === 'signature_request');
+    if (!requestItem) return;
+
+    try {
+      setIsProcessing(true);
+      // First save the current items just in case (like QR codes placed alongside the request)
+      await saveDocumentToServer(items.filter(i => i.type !== 'signature_request'), documentId);
+      
+      await api.post(`/documents/${documentId}/request-signature`, {
+        email: requestItem.signerEmail,
+        name: requestItem.signerName,
+        coordinateData: JSON.stringify({
+          pageNumber: requestItem.pageNumber,
+          x: requestItem.x,
+          y: requestItem.y,
+          width: requestItem.width,
+          height: requestItem.height,
+        })
+      });
+      setIsSaved(true);
+      toast.success(`Signature request sent to ${requestItem.signerEmail}`);
+    } catch (error) {
+      console.error('Error sending request', error);
+      toast.error('Failed to send signature request');
     } finally {
       setIsProcessing(false);
     }
@@ -156,9 +224,9 @@ export default function SignDocumentPage() {
     if (!documentId || !isSaved) return;
     try {
       setIsProcessing(true);
-      
+
       const signedPdfBlob = await exportDocument(documentId);
-      
+
       // Trigger download
       const url = URL.createObjectURL(signedPdfBlob);
       const a = document.createElement('a');
@@ -168,10 +236,10 @@ export default function SignDocumentPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
     } catch (error) {
       console.error('Error exporting document', error);
-      alert('Failed to export document. Please check console for details.');
+      toast.error('Failed to export document. Please check console for details.');
     } finally {
       setIsProcessing(false);
     }
@@ -180,87 +248,27 @@ export default function SignDocumentPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:h-16 justify-between gap-3 sm:gap-0">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm h-16 flex items-center">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="p-2 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
-              <Home className="w-5 h-5" />
-            </Link>
-            <div className="flex items-center gap-2">
-              <div className="bg-blue-600 p-2 rounded-lg shrink-0">
-                <FileSignature className="h-5 w-5 text-white" />
-              </div>
-              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">
-                DocSign MVP
+            <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <img src={logoApp} alt="Logo" className="h-8 object-contain" />
+              <div className="hidden sm:block h-5 w-px bg-slate-200 mx-2"></div>
+              <h1 className="text-sm font-normal text-slate-800 hidden sm:block">
+                Kembali ke dashboard
               </h1>
-            </div>
+            </Link>
           </div>
-          
-          {pdfUrl && (
-            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 p-3 sm:static sm:p-0 sm:border-t-0 sm:bg-transparent z-50 flex gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible hide-scrollbar shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:shadow-none items-center">
-              <button
-                onClick={() => setShowSignaturePad(true)}
-                disabled={isSaved}
-                className="flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium rounded-lg transition-colors"
-              >
-                <FileSignature className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:inline">Add Signature</span>
-                <span className="lg:hidden">Signature</span>
-              </button>
-              <button
-                onClick={handleAddQrCode}
-                disabled={isSaved}
-                className="flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium rounded-lg transition-colors"
-              >
-                <QrCode className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:inline">Add QR Code</span>
-                <span className="lg:hidden">QR</span>
-              </button>
-              <button
-                onClick={handleAddVerifyQrCode}
-                disabled={isSaved}
-                className="flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium rounded-lg transition-colors"
-              >
-                <QrCode className="h-4 w-4 shrink-0" />
-                <span className="hidden lg:inline">Add Verification QR</span>
-                <span className="lg:hidden">Verify QR</span>
-              </button>
-              {!isSaved && (
-                <>
-                  <button
-                    onClick={handleSaveDocument}
-                    disabled={isProcessing}
-                    className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-70 text-sm font-medium rounded-lg transition-colors shadow-sm"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
-                    <span className="hidden sm:inline">Save as Draft</span>
-                    <span className="sm:hidden">Draft</span>
-                  </button>
-                  <button
-                    onClick={handlePublish}
-                    disabled={isProcessing}
-                    className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
-                    <span className="hidden sm:inline">Publish Document</span>
-                    <span className="sm:hidden">Publish</span>
-                  </button>
-                </>
-              )}
-              
-              {isSaved && (
-                <button
-                  onClick={handleExport}
-                  disabled={isProcessing}
-                  className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                >
-                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
-                  <span className="hidden sm:inline">Export PDF</span>
-                  <span className="sm:hidden">Export</span>
-                </button>
-              )}
-            </div>
-          )}
+
+          <div className="flex items-center gap-3">
+            <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wider 
+              ${documentStatus === 'PUBLISHED' ? 'bg-purple-100 text-purple-700' : 
+                documentStatus === 'SIGNED' ? 'bg-emerald-100 text-emerald-700' : 
+                documentStatus === 'SIGNATURE_REQUESTED' ? 'bg-orange-100 text-orange-700' : 
+                'bg-slate-100 text-slate-600'}`}>
+              {documentStatus.replace('_', ' ')}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -268,21 +276,109 @@ export default function SignDocumentPage() {
       <main className="max-w-5xl mx-auto mt-6 sm:mt-8 px-4 pb-24 sm:pb-8">
         {!pdfUrl ? (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-4 mt-8 sm:mt-12">
-             {isProcessing ? (
-               <div className="flex flex-col items-center justify-center py-20">
-                 <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                 <p className="text-slate-600 font-medium">Uploading Document...</p>
-               </div>
-             ) : (
-               <DocumentUpload onFileSelect={handleFileUpload} />
-             )}
+            {isProcessing ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+                <p className="text-slate-600 font-medium">Uploading Document...</p>
+              </div>
+            ) : (
+              <DocumentUpload onFileSelect={handleFileUpload} />
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center">
+
+            {/* Editor Toolbar */}
+            <div className="w-full bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-3 mb-6 mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 sticky top-20 z-30">
+              {/* Left: Tools */}
+              <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowSignaturePad(true)}
+                  disabled={isSaved}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 p-2 px-1 sm:px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-xl transition-colors border border-slate-200"
+                >
+                  <FileSignature className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="text-[10px] sm:text-sm text-center leading-tight">Signature</span>
+                </button>
+                <button
+                  onClick={handleAddQrCode}
+                  disabled={isSaved}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 p-2 px-1 sm:px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-xl transition-colors border border-slate-200"
+                >
+                  <QrCode className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="text-[10px] sm:text-sm text-center leading-tight">QR Code</span>
+                </button>
+                <button
+                  onClick={handleAddVerifyQrCode}
+                  disabled={isSaved}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-700 font-medium rounded-xl transition-all shadow-sm border border-indigo-100 hover:border-indigo-200"
+                >
+                  <QrCode className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="text-[10px] sm:text-sm text-center leading-tight">Verify QR</span>
+                </button>
+                <button
+                  onClick={handleAddRequestSignature}
+                  disabled={isSaved}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 bg-orange-50 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed text-orange-700 font-medium rounded-xl transition-all shadow-sm border border-orange-100 hover:border-orange-200"
+                >
+                  <Mail className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="text-[10px] sm:text-sm text-center leading-tight">Req. Sign</span>
+                </button>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2 w-full sm:w-auto pt-2 border-t border-slate-100 sm:pt-0 sm:border-t-0 shrink-0">
+                {!isSaved ? (
+                  <>
+                    <button
+                      onClick={handleSaveDocument}
+                      disabled={isProcessing}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-70 disabled:cursor-not-allowed text-slate-700 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
+                      <span className="hidden sm:inline">Save Draft</span>
+                      <span className="sm:hidden">Save</span>
+                    </button>
+                    
+                    {items.some(i => i.type === 'signature_request') ? (
+                      <button
+                        onClick={handleSendSignatureRequest}
+                        disabled={isProcessing}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+                      >
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
+                        <span className="hidden sm:inline">Send Request</span>
+                        <span className="sm:hidden">Send</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handlePublish}
+                        disabled={isProcessing}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+                      >
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
+                        <span className="hidden sm:inline">Publish</span>
+                        <span className="sm:hidden">Publish</span>
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    onClick={handleExport}
+                    disabled={isProcessing}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 text-white text-sm font-medium rounded-xl transition-colors shadow-md"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
+                    <span>Export PDF</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="w-full" ref={containerRef}>
-              <PdfViewer 
-                file={pdfUrl} 
-                onPageChange={setCurrentPage} 
+              <PdfViewer
+                file={pdfUrl}
+                onPageChange={setCurrentPage}
               >
                 {/* Render items that belong to the current page as children of PdfViewer */}
                 {!isSaved && items.filter(item => item.pageNumber === currentPage).map(item => (
@@ -307,6 +403,55 @@ export default function SignDocumentPage() {
           onSave={handleAddSignature}
           onClose={() => setShowSignaturePad(false)}
         />
+      )}
+
+      {showRequestModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-xl font-bold text-slate-800">Request Remote Signature</h3>
+              <p className="text-slate-500 text-sm mt-1">
+                An email will be sent with a secure link to sign this document.
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Signer Name</label>
+                <input
+                  type="text"
+                  value={requestName}
+                  onChange={(e) => setRequestName(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Signer Email</label>
+                <input
+                  type="email"
+                  value={requestEmail}
+                  onChange={(e) => setRequestEmail(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. john@example.com"
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowRequestModal(false)}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitRequestSignatureModal}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Add Placeholder
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

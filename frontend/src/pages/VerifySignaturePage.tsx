@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, Calendar, User, FileText, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle, Calendar, User, FileText, Loader2, XCircle } from 'lucide-react';
 import api from '../lib/api';
+import logoApp from '../assets/logo.webp';
 
 interface VerifyData {
   documentId: string;
@@ -81,8 +82,8 @@ export default function VerifySignaturePage() {
           </div>
           
           <div className="relative z-10 flex flex-col items-center">
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-4">
-              <ShieldCheck className="w-12 h-12 text-green-500" />
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden border-4 border-blue-100">
+              <img src={logoApp} alt="Logo" className="w-16 object-contain" />
             </div>
             <h1 className="text-2xl font-bold mb-1">Dokumen Valid</h1>
             <p className="text-blue-100 text-sm">Tanda tangan digital telah diverifikasi</p>

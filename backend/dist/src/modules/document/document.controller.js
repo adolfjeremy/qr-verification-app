@@ -18,18 +18,24 @@ const platform_express_1 = require("@nestjs/platform-express");
 const document_service_1 = require("./document.service");
 const storage_service_1 = require("../storage/storage.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const email_service_1 = require("../email/email.service");
+const crypto_service_1 = require("../crypto/crypto.service");
+const audit_service_1 = require("../audit/audit.service");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const crypto = require("crypto");
 let DocumentController = class DocumentController {
-    constructor(documentService, storageService, prismaService) {
+    constructor(documentService, storageService, prismaService, emailService, cryptoService, auditService) {
         this.documentService = documentService;
         this.storageService = storageService;
         this.prismaService = prismaService;
+        this.emailService = emailService;
+        this.cryptoService = cryptoService;
+        this.auditService = auditService;
     }
     async getUserDocuments(req) {
         const user = req.user;
         return this.prismaService.document.findMany({
-            where: { uploaderId: user.id },
+            where: { uploaderId: user.id, deletedAt: null },
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
@@ -57,12 +63,14 @@ let DocumentController = class DocumentController {
             if (!document || document.uploaderId !== user.id)
                 throw new common_1.BadRequestException('Unauthorized');
             const fileBuffer = await this.storageService.getFileBuffer(document.fileUrl);
-            const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, signData.items);
+            const pdfBuffer = await this.documentService.processDocument(fileBuffer, signData.items);
+            const signedPdfBuffer = await this.cryptoService.signPdf(pdfBuffer);
             await this.storageService.uploadFile(document.fileUrl, signedPdfBuffer);
             await this.prismaService.document.update({
                 where: { id: documentId },
-                data: { status: 'SIGNED', items: signData.items || [] }
+                data: { status: 'PUBLISHED', items: signData.items || [] }
             });
+            await this.auditService.logAction(document.id, 'PUBLISHED', user.id, req.ip, req.headers['user-agent'], 'Document was digitally signed (PKI) and published.');
             return { message: 'Document published successfully' };
         }
         catch (error) {
@@ -102,6 +110,7 @@ let DocumentController = class DocumentController {
                     items: [],
                 }
             });
+            await this.auditService.logAction(id, 'UPLOADED', user.id, req.ip, req.headers['user-agent'], 'Document was uploaded.');
             return { id: document.id };
         }
         catch (error) {
@@ -111,7 +120,7 @@ let DocumentController = class DocumentController {
     async getDocumentDetails(id, req) {
         const user = req.user;
         const document = await this.prismaService.document.findUnique({ where: { id } });
-        if (!document)
+        if (!document || document.deletedAt)
             throw new common_1.BadRequestException('Document not found');
         if (document.uploaderId !== user.id)
             throw new common_1.BadRequestException('Unauthorized access to document');
@@ -180,23 +189,131 @@ let DocumentController = class DocumentController {
             uploaderName: document.uploader.name,
         };
     }
+    async requestSignature(id, email, name, coordinateDataStr, req) {
+        if (!email || !name || !coordinateDataStr) {
+            throw new common_1.BadRequestException('email, name, and coordinateData are required.');
+        }
+        let coordinateData;
+        try {
+            coordinateData = JSON.parse(coordinateDataStr);
+        }
+        catch (e) {
+            throw new common_1.BadRequestException('Invalid JSON in coordinateData.');
+        }
+        const user = req.user;
+        const document = await this.prismaService.document.findUnique({ where: { id } });
+        if (!document)
+            throw new common_1.BadRequestException('Document not found');
+        if (document.uploaderId !== user.id)
+            throw new common_1.BadRequestException('Unauthorized');
+        const token = crypto.randomUUID();
+        await this.prismaService.signatureRequest.create({
+            data: {
+                documentId: id,
+                email,
+                name,
+                token,
+                coordinateData,
+            }
+        });
+        await this.prismaService.document.update({
+            where: { id },
+            data: { status: 'PENDING_SIGNATURE' }
+        });
+        const APP_URL = process.env.VITE_APP_URL || 'http://localhost:5173';
+        const signLink = `${APP_URL}/sign-request/${token}`;
+        await this.emailService.sendSignatureRequest(email, name, document.title, signLink);
+        await this.auditService.logAction(id, 'SIGNATURE_REQUESTED', user.id, req.ip, req.headers['user-agent'], `Requested signature from ${email} (${name})`);
+        return { message: 'Signature request sent successfully' };
+    }
+    async getSignatureRequest(token) {
+        const request = await this.prismaService.signatureRequest.findUnique({
+            where: { token },
+            include: { document: true }
+        });
+        if (!request)
+            throw new common_1.BadRequestException('Invalid or expired request link');
+        if (request.status === 'COMPLETED')
+            throw new common_1.BadRequestException('This document has already been signed');
+        const API_URL = process.env.API_URL || 'http://localhost:3000';
+        return {
+            id: request.id,
+            documentId: request.documentId,
+            documentTitle: request.document.title,
+            signerEmail: request.email,
+            signerName: request.name,
+            coordinateData: request.coordinateData,
+            fileViewUrl: `${API_URL}/api/documents/${request.documentId}/view`,
+        };
+    }
+    async submitRemoteSignature(token, signatureBase64, req) {
+        if (!signatureBase64)
+            throw new common_1.BadRequestException('signatureBase64 is required');
+        const request = await this.prismaService.signatureRequest.findUnique({
+            where: { token },
+            include: { document: true }
+        });
+        if (!request)
+            throw new common_1.BadRequestException('Invalid or expired request link');
+        if (request.status === 'COMPLETED')
+            throw new common_1.BadRequestException('This document has already been signed');
+        const documentId = request.documentId;
+        const coords = request.coordinateData;
+        const itemsToSign = [
+            {
+                type: 'signature',
+                pageNumber: coords.pageNumber,
+                x: coords.x,
+                y: coords.y,
+                width: coords.width,
+                height: coords.height,
+                base64Image: signatureBase64,
+            }
+        ];
+        let existingItems = [];
+        if (request.document.items) {
+            if (typeof request.document.items === 'string') {
+                try {
+                    existingItems = JSON.parse(request.document.items);
+                }
+                catch (e) { }
+            }
+            else if (Array.isArray(request.document.items)) {
+                existingItems = request.document.items;
+            }
+        }
+        const combinedItems = [...existingItems, ...itemsToSign];
+        const fileBuffer = await this.storageService.getFileBuffer(request.document.fileUrl);
+        const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, combinedItems);
+        await this.storageService.uploadFile(request.document.fileUrl, signedPdfBuffer);
+        await this.prismaService.signatureRequest.update({
+            where: { id: request.id },
+            data: { status: 'COMPLETED', completedAt: new Date() }
+        });
+        await this.prismaService.document.update({
+            where: { id: documentId },
+            data: { status: 'SIGNED', items: combinedItems }
+        });
+        await this.auditService.logAction(documentId, 'SIGNED', null, req.ip, req.headers['user-agent'], `Document signed by ${request.name} (${request.email}) via remote request.`);
+        return { message: 'Document signed successfully' };
+    }
     async deleteDocument(id, req) {
         const user = req.user;
         const document = await this.prismaService.document.findUnique({
             where: { id },
         });
-        if (!document) {
+        if (!document || document.deletedAt) {
             throw new common_1.BadRequestException('Document not found');
         }
         if (document.uploaderId !== user.id) {
             throw new common_1.BadRequestException('You do not have permission to delete this document');
         }
         try {
-            await this.prismaService.signature.deleteMany({ where: { documentId: id } });
-            await this.prismaService.verification.deleteMany({ where: { documentId: id } });
-            await this.prismaService.document.delete({
+            await this.prismaService.document.update({
                 where: { id },
+                data: { deletedAt: new Date() },
             });
+            await this.auditService.logAction(id, 'DELETED', user.id, req.ip, req.headers['user-agent'], 'Document was permanently deleted by user.');
             await this.storageService.deleteFile(document.fileUrl);
             return { message: 'Document deleted successfully' };
         }
@@ -282,6 +399,34 @@ __decorate([
 ], DocumentController.prototype, "verifyDocument", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)(':id/request-signature'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('email')),
+    __param(2, (0, common_1.Body)('name')),
+    __param(3, (0, common_1.Body)('coordinateData')),
+    __param(4, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], DocumentController.prototype, "requestSignature", null);
+__decorate([
+    (0, common_1.Get)('request/:token'),
+    __param(0, (0, common_1.Param)('token')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], DocumentController.prototype, "getSignatureRequest", null);
+__decorate([
+    (0, common_1.Post)('request/:token/sign'),
+    __param(0, (0, common_1.Param)('token')),
+    __param(1, (0, common_1.Body)('signatureBase64')),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], DocumentController.prototype, "submitRemoteSignature", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Req)()),
@@ -293,6 +438,9 @@ exports.DocumentController = DocumentController = __decorate([
     (0, common_1.Controller)('api/documents'),
     __metadata("design:paramtypes", [document_service_1.DocumentService,
         storage_service_1.StorageService,
-        prisma_service_1.PrismaService])
+        prisma_service_1.PrismaService,
+        email_service_1.EmailService,
+        crypto_service_1.CryptoService,
+        audit_service_1.AuditService])
 ], DocumentController);
 //# sourceMappingURL=document.controller.js.map

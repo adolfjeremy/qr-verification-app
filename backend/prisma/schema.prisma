@@ -11,12 +11,13 @@ model User {
   email         String         @unique
   name          String         @default("User")
   password_hash String
-  role          String         @default("USER")
+  role          String         @default("USER") // USER, SUPER_ADMIN
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   documents     Document[]
   signatures    Signature[]
   savedSignatures SavedSignature[]
+  auditLogs     AuditLog[]
 }
 
 model SavedSignature {
@@ -28,27 +29,43 @@ model SavedSignature {
 }
 
 model Document {
-  id          String         @id @default(uuid())
-  title       String
-  status      String         @default("DRAFT") // DRAFT, SIGNED
-  fileUrl     String
-  items       Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  uploaderId  String
-  uploader    User           @relation(fields: [uploaderId], references: [id])
-  signatures  Signature[]
-  verifications Verification[]
+  id                String             @id @default(uuid())
+  title             String
+  status            String             @default("DRAFT") // DRAFT, PENDING_SIGNATURE, SIGNED, PUBLISHED
+  fileUrl           String
+  items             Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  uploaderId        String
+  uploader          User               @relation(fields: [uploaderId], references: [id])
+  signatures        Signature[]
+  verifications     Verification[]
+  signatureRequests SignatureRequest[]
+  auditLogs         AuditLog[]
 }
 
 model Signature {
   id             String    @id @default(uuid())
   documentId     String
-  signerId       String
+  signerId       String?   // Optional for external signers
   coordinateData Json
   signedAt       DateTime  @default(now())
   document       Document  @relation(fields: [documentId], references: [id])
-  signer         User      @relation(fields: [signerId], references: [id])
+  signer         User?     @relation(fields: [signerId], references: [id])
+}
+
+model SignatureRequest {
+  id             String    @id @default(uuid())
+  documentId     String
+  email          String
+  name           String
+  token          String    @unique
+  status         String    @default("PENDING") // PENDING, COMPLETED
+  coordinateData Json      // Where the signature should be placed
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
 
 model Verification {
@@ -58,4 +75,17 @@ model Verification {
   isValid    Boolean  @default(true)
   createdAt  DateTime @default(now())
   document   Document @relation(fields: [documentId], references: [id])
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  documentId  String
+  userId      String?
+  action      String    // e.g., UPLOADED, VIEWED, SIGNATURE_REQUESTED, SIGNED, PUBLISHED
+  ipAddress   String?
+  userAgent   String?
+  details     String?   @db.Text
+  createdAt   DateTime  @default(now())
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

@@ -5,6 +5,8 @@ import VerifySignaturePage from './pages/VerifySignaturePage';
 import ViewDocumentPage from './pages/ViewDocumentPage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import PublicSignPage from './pages/PublicSignPage';
+import DocumentAuditPage from './pages/DocumentAuditPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -15,12 +17,14 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify/:id" element={<VerifySignaturePage />} />
         <Route path="/doc/:id" element={<ViewDocumentPage />} />
+        <Route path="/sign-request/:token" element={<PublicSignPage />} />
         
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<SignDocumentPage />} />
           <Route path="/sign/:id" element={<SignDocumentPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/audit" element={<DocumentAuditPage />} />
         </Route>
       </Routes>
     </div>
