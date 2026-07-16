@@ -1,25 +1,20 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { PdfViewer } from '../components/PdfViewer';
 import { SignaturePad } from '../components/SignaturePad';
 import { DraggableOverlay, type DraggableItem } from '../components/DraggableOverlay';
-import { signDocument, saveDocumentToServer } from '../services/document.service';
-import { FileSignature, QrCode, Download, Loader2, Save, Edit } from 'lucide-react';
-
-const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    try {
-      return crypto.randomUUID();
-    } catch (e) {
-      // fallback if not in secure context
-    }
-  }
-  return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
-};
+import { publishDocument, exportDocument, saveDocumentToServer, createDraftDocument } from '../services/document.service';
+import { FileSignature, QrCode, Download, Loader2, Save, Send, Home } from 'lucide-react';
+import api from '../lib/api';
 
 export default function SignDocumentPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
   const [documentId, setDocumentId] = useState<string>('');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  
   const [isSaved, setIsSaved] = useState(false);
   const [items, setItems] = useState<DraggableItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
@@ -28,6 +23,46 @@ export default function SignDocumentPage() {
   
   // Ref for the container to maintain relative positioning bounds
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (id) {
+      setIsProcessing(true);
+      api.get(`/documents/${id}`).then(res => {
+        setDocumentId(id);
+        setPdfUrl(res.data.fileViewUrl);
+        
+        // Handle legacy items format just in case, but usually it's an array
+        let parsedItems = res.data.items;
+        if (typeof parsedItems === 'string') {
+          try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+        }
+        setItems(parsedItems || []);
+        
+        setIsSaved(res.data.status === 'SIGNED');
+      }).catch(() => {
+        alert('Document not found or unauthorized');
+        navigate('/dashboard');
+      }).finally(() => {
+        setIsProcessing(false);
+      });
+    } else {
+      setPdfUrl(null);
+      setItems([]);
+    }
+  }, [id, navigate]);
+
+  const handleFileUpload = async (f: File) => {
+    try {
+      setIsProcessing(true);
+      const res = await createDraftDocument(f);
+      navigate(`/sign/${res.id}`);
+    } catch (error) {
+      console.error('Error creating draft', error);
+      alert('Failed to upload document');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleAddSignature = (base64: string) => {
     setItems([
@@ -89,13 +124,11 @@ export default function SignDocumentPage() {
   };
 
   const handleSaveDocument = async () => {
-    if (!file) return;
+    if (!documentId) return;
     try {
       setIsProcessing(true);
-
-      await saveDocumentToServer(file, items, documentId);
-      setIsSaved(true);
-      alert('Document saved successfully!');
+      await saveDocumentToServer(items, documentId);
+      alert('Draft saved successfully!');
     } catch (error) {
       console.error('Error saving document', error);
       alert('Failed to save document. Please check console for details.');
@@ -104,26 +137,41 @@ export default function SignDocumentPage() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!file || !isSaved) return;
+  const handlePublish = async () => {
+    if (!documentId) return;
+    try {
+      setIsProcessing(true);
+      await publishDocument(items, documentId);
+      setIsSaved(true);
+      alert('Document published successfully!');
+    } catch (error) {
+      console.error('Error publishing document', error);
+      alert('Failed to publish document. Please check console for details.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!documentId || !isSaved) return;
     try {
       setIsProcessing(true);
       
-      const signedPdfBlob = await signDocument(file, items);
+      const signedPdfBlob = await exportDocument(documentId);
       
       // Trigger download
       const url = URL.createObjectURL(signedPdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `signed-${file.name}`;
+      a.download = `signed-document.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
     } catch (error) {
-      console.error('Error signing document', error);
-      alert('Failed to sign document. Please check console for details.');
+      console.error('Error exporting document', error);
+      alert('Failed to export document. Please check console for details.');
     } finally {
       setIsProcessing(false);
     }
@@ -134,16 +182,21 @@ export default function SignDocumentPage() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:h-16 justify-between gap-3 sm:gap-0">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg shrink-0">
-              <FileSignature className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-4">
+            <Link to="/dashboard" className="p-2 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+              <Home className="w-5 h-5" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-600 p-2 rounded-lg shrink-0">
+                <FileSignature className="h-5 w-5 text-white" />
+              </div>
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">
+                DocSign MVP
+              </h1>
             </div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">
-              DocSign MVP
-            </h1>
           </div>
           
-          {file && (
+          {pdfUrl && (
             <div className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 p-3 sm:static sm:p-0 sm:border-t-0 sm:bg-transparent z-50 flex gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible hide-scrollbar shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:shadow-none items-center">
               <button
                 onClick={() => setShowSignaturePad(true)}
@@ -172,39 +225,40 @@ export default function SignDocumentPage() {
                 <span className="hidden lg:inline">Add Verification QR</span>
                 <span className="lg:hidden">Verify QR</span>
               </button>
-              {!isSaved ? (
-                <button
-                  onClick={handleSaveDocument}
-                  disabled={isProcessing}
-                  className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                >
-                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
-                  <span className="hidden sm:inline">Save Document</span>
-                  <span className="sm:hidden">Save</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setIsSaved(false)}
-                  disabled={isProcessing}
-                  className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                >
-                  <Edit className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Edit Document</span>
-                  <span className="sm:hidden">Edit</span>
-                </button>
+              {!isSaved && (
+                <>
+                  <button
+                    onClick={handleSaveDocument}
+                    disabled={isProcessing}
+                    className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-70 text-sm font-medium rounded-lg transition-colors shadow-sm"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
+                    <span className="hidden sm:inline">Save as Draft</span>
+                    <span className="sm:hidden">Draft</span>
+                  </button>
+                  <button
+                    onClick={handlePublish}
+                    disabled={isProcessing}
+                    className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
+                    <span className="hidden sm:inline">Publish Document</span>
+                    <span className="sm:hidden">Publish</span>
+                  </button>
+                </>
               )}
               
-              <div className="relative group shrink-0" title={!isSaved ? "Save the document first" : ""}>
+              {isSaved && (
                 <button
-                  onClick={handleSubmit}
-                  disabled={isProcessing || !isSaved}
+                  onClick={handleExport}
+                  disabled={isProcessing}
                   className="flex shrink-0 items-center gap-2 px-4 sm:px-6 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
                 >
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
                   <span className="hidden sm:inline">Export PDF</span>
                   <span className="sm:hidden">Export</span>
                 </button>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -212,23 +266,26 @@ export default function SignDocumentPage() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto mt-6 sm:mt-8 px-4 pb-24 sm:pb-8">
-        {!file ? (
+        {!pdfUrl ? (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-4 mt-8 sm:mt-12">
-             <DocumentUpload onFileSelect={(f) => { 
-                setFile(f); 
-                setDocumentId(generateId());
-                setIsSaved(false);
-             }} />
+             {isProcessing ? (
+               <div className="flex flex-col items-center justify-center py-20">
+                 <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+                 <p className="text-slate-600 font-medium">Uploading Document...</p>
+               </div>
+             ) : (
+               <DocumentUpload onFileSelect={handleFileUpload} />
+             )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center">
             <div className="w-full" ref={containerRef}>
               <PdfViewer 
-                file={file} 
+                file={pdfUrl} 
                 onPageChange={setCurrentPage} 
               >
                 {/* Render items that belong to the current page as children of PdfViewer */}
-                {items.filter(item => item.pageNumber === currentPage).map(item => (
+                {!isSaved && items.filter(item => item.pageNumber === currentPage).map(item => (
                   <DraggableOverlay
                     key={item.id}
                     item={item}

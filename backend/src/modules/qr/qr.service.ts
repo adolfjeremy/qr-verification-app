@@ -11,11 +11,12 @@ export class QrService {
    */
   async generateQrCode(content: string, isVerify: boolean = false): Promise<Buffer> {
     try {
-      const color = isVerify ? { dark: '#2563ebff', light: '#ffffffff' } : { dark: '#000000ff', light: '#ffffffff' };
+      // Use dark blue for Verify QR, black for standard Document QR
+      const color = isVerify ? { dark: '#064ad4ff', light: '#ffffffff' } : { dark: '#000000ff', light: '#ffffffff' };
       const qrBuffer = await QRCode.toBuffer(content, {
         errorCorrectionLevel: 'H',
         margin: 1,
-        width: 300,
+        width: 1000, // Very high resolution to avoid blurriness
         color,
       });
 
@@ -25,19 +26,20 @@ export class QrService {
 
       const path = require('path');
       const fs = require('fs');
-      const logoPath = path.join(process.cwd(), '..', 'frontend', 'src', 'assets', 'logo_bapp.png');
+      const logoPath = path.join(process.cwd(), '..', 'frontend', 'src', 'assets', 'logo-verified.png');
       
       let compositeBuffer;
       if (fs.existsSync(logoPath)) {
         const logoBuffer = fs.readFileSync(logoPath);
         
-        // Resize logo and add white background for better visibility
-        // Make it larger (e.g. 120x120) since the QR code is 300x300
+        // Resize logo to 40% of the QR code width (400x400)
+        // 'H' error correction allows up to 30% area covered (40% width = 16% area, completely safe)
         const resizedLogo = await sharp(logoBuffer)
-          .resize(150, 150, { 
+          .resize(400, 400, { 
             fit: 'contain',
             background: { r: 255, g: 255, b: 255, alpha: 1 }
           })
+          .flatten({ background: { r: 255, g: 255, b: 255 } }) // Make background white instead of transparent
           .png()
           .toBuffer();
 

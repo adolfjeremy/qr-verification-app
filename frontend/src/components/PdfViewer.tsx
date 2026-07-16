@@ -10,7 +10,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 interface PdfViewerProps {
-  file: File;
+  file: File | string;
   onPageChange?: (page: number) => void;
   onPageLoad?: (pageInfo: { width: number; height: number; pageNumber: number }) => void;
   children?: React.ReactNode;

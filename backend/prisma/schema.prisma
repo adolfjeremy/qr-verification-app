@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String         @default("User")
+  password_hash String
+  role          String         @default("USER")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  documents     Document[]
+  signatures    Signature[]
+  savedSignatures SavedSignature[]
+}
+
+model SavedSignature {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  signatureBase64 String   @db.Text
+  createdAt       DateTime @default(now())
+}
+
+model Document {
+  id          String         @id @default(uuid())
+  title       String
+  status      String         @default("DRAFT") // DRAFT, SIGNED
+  fileUrl     String
+  items       Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  uploaderId  String
+  uploader    User           @relation(fields: [uploaderId], references: [id])
+  signatures  Signature[]
+  verifications Verification[]
+}
+
+model Signature {
+  id             String    @id @default(uuid())
+  documentId     String
+  signerId       String
+  coordinateData Json
+  signedAt       DateTime  @default(now())
+  document       Document  @relation(fields: [documentId], references: [id])
+  signer         User      @relation(fields: [signerId], references: [id])
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  documentId String
+  qrHash     String   @unique
+  isValid    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id])
+}

@@ -7,8 +7,8 @@ export default function ViewDocumentPage() {
 
   useEffect(() => {
     if (id) {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const pdfUrl = `${API_URL}/uploads/${id}.pdf`;
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const pdfUrl = `${API_URL}/documents/${id}/view`;
       window.location.replace(pdfUrl);
     }
   }, [id]);

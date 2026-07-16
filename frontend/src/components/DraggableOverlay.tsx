@@ -2,7 +2,7 @@ import React from 'react';
 import { Rnd } from 'react-rnd';
 import { X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import logoBapp from '../assets/logo_bapp.png';
+import logoVerified from '../assets/logo-verified.png';
 
 export interface DraggableItem {
   id: string;
@@ -51,7 +51,7 @@ export const DraggableOverlay: React.FC<DraggableOverlayProps> = ({ item, onChan
       className={`absolute ${!disabled ? 'group border-2 border-dashed border-blue-500 bg-blue-500/10 cursor-move' : ''}`}
     >
       {!disabled && (
-        <button 
+        <button
           onClick={() => onRemove(item.id)}
           className="absolute -top-3 -right-3 hidden group-hover:flex items-center justify-center bg-red-500 text-white rounded-full p-1 z-10 hover:bg-red-600 transition-colors shadow-sm"
         >
@@ -62,29 +62,30 @@ export const DraggableOverlay: React.FC<DraggableOverlayProps> = ({ item, onChan
       {item.type === 'signature' && item.base64Image && (
         <img src={item.base64Image} alt="Signature" className="w-full h-full object-contain pointer-events-none" />
       )}
-      
+
       {item.type === 'qrcode_doc' && (
         <div className="w-full h-full flex items-center justify-center bg-white p-1 pointer-events-none relative">
-           <QRCodeSVG 
-              value={item.qrContent || 'http://192.168.1.4:5173/'}
-              style={{ width: '100%', height: '100%' }}
-           />
+          <QRCodeSVG
+            value={item.qrContent || 'http://192.168.1.4:5173/'}
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
       )}
 
       {item.type === 'qrcode_verify' && (
-        <div className="w-full h-full flex items-center justify-center bg-white p-1 pointer-events-none relative">
-           <QRCodeSVG 
-              value={item.qrContent || 'http://192.168.1.4:5173/'}
-              style={{ width: '100%', height: '100%' }}
-              fgColor="#2563eb"
-              imageSettings={{
-                src: logoBapp,
-                height: 70,
-                width: 70,
-                excavate: true,
-              }}
-           />
+        <div style={{ pointerEvents: 'none', position: 'relative' }}>
+          <QRCodeSVG
+            value={item.qrContent || ''}
+            size={item.width}
+            level="H"
+            fgColor="#064ad4"
+            imageSettings={{
+              src: logoVerified,
+              height: item.width * 0.40,
+              width: item.width * 0.40,
+              excavate: true,
+            }}
+          />
         </div>
       )}
     </Rnd>

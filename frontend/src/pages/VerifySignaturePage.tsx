@@ -1,24 +1,71 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, Calendar, User, FileText } from 'lucide-react';
+import { CheckCircle, ShieldCheck, Calendar, User, FileText, Loader2, XCircle } from 'lucide-react';
+import api from '../lib/api';
+
+interface VerifyData {
+  documentId: string;
+  title: string;
+  status: string;
+  signedDate: string;
+  uploader: string;
+  uploaderName?: string;
+}
 
 export default function VerifySignaturePage() {
   const { id } = useParams();
-  
-  // In a real application, we would fetch data from the backend using the id.
-  // For the MVP, we use mock data.
-  const mockData = {
-    documentId: id || 'DOC-2026-07',
-    signedDate: new Date().toLocaleDateString('id-ID', {
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    signerName: 'Pejabat BAPP Berwenang',
-    documentTitle: 'Dokumen Persetujuan Resmi',
-  };
+  const [data, setData] = useState<VerifyData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchVerification = async () => {
+      try {
+        const response = await api.get(`/documents/${id}/verify`);
+        setData(response.data);
+      } catch (err) {
+        setError('Document not found or invalid.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (id) {
+      fetchVerification();
+    } else {
+      setError('No document ID provided.');
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <XCircle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold text-slate-800">Verification Failed</h2>
+        <p className="text-slate-500 mt-2">{error}</p>
+        <Link to="/" className="mt-6 px-6 py-2 bg-slate-800 text-white rounded-lg">Return to Home</Link>
+      </div>
+    );
+  }
+
+  const formattedDate = new Date(data.signedDate).toLocaleDateString('id-ID', {
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const viewUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/documents/${data.documentId}/view`;
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden">
@@ -49,8 +96,8 @@ export default function VerifySignaturePage() {
             </div>
             <div>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Dokumen</p>
-              <p className="font-semibold text-slate-800">{mockData.documentTitle}</p>
-              <p className="text-xs text-slate-500 mt-1">ID: {mockData.documentId}</p>
+              <p className="font-semibold text-slate-800">{data.title}</p>
+              <p className="text-xs text-slate-500 mt-1">ID: {data.documentId}</p>
             </div>
           </div>
 
@@ -59,8 +106,9 @@ export default function VerifySignaturePage() {
               <User className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Penandatangan</p>
-              <p className="font-semibold text-slate-800">{mockData.signerName}</p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Pengunggah / Author</p>
+              <p className="font-semibold text-slate-800">{data.uploaderName || 'User'}</p>
+              <p className="text-xs text-slate-500 mt-1">{data.uploader}</p>
             </div>
           </div>
 
@@ -69,8 +117,8 @@ export default function VerifySignaturePage() {
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Waktu Tanda Tangan</p>
-              <p className="font-semibold text-slate-800">{mockData.signedDate}</p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Terakhir Diperbarui</p>
+              <p className="font-semibold text-slate-800">{formattedDate}</p>
             </div>
           </div>
 
@@ -81,7 +129,7 @@ export default function VerifySignaturePage() {
 
           <div className="pt-4 flex flex-col gap-3">
             <a 
-              href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/uploads/${id || 'DOC-2026-07'}.pdf`}
+              href={viewUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-md hover:shadow-lg"

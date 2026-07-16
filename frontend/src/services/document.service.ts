@@ -1,40 +1,34 @@
 import type { DraggableItem } from "../components/DraggableOverlay";
+import api from '../lib/api';
 
-export const signDocument = async (file: File, items: DraggableItem[]) => {
-  const formData = new FormData();
-  formData.append('document', file);
-  formData.append('signData', JSON.stringify({ items }));
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-  const response = await fetch(`${API_URL}/api/documents/sign`, {
-    method: 'POST',
-    body: formData,
+export const publishDocument = async (items: DraggableItem[], documentId: string) => {
+  const response = await api.post('/documents/publish', {
+    signData: JSON.stringify({ items }),
+    documentId
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to sign document');
-  }
-
-  return response.blob();
+  return response.data;
 };
 
-export const saveDocumentToServer = async (file: File, items: DraggableItem[], documentId: string) => {
-  const formData = new FormData();
-  formData.append('document', file);
-  formData.append('signData', JSON.stringify({ items }));
-  formData.append('documentId', documentId);
+export const exportDocument = async (documentId: string) => {
+  const response = await api.get(`/documents/${documentId}/export`, {
+    responseType: 'blob', // Important for downloading the PDF
+  });
+  return response.data; // this is the blob
+};
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-  const response = await fetch(`${API_URL}/api/documents/save`, {
-    method: 'POST',
-    body: formData,
+export const saveDocumentToServer = async (items: DraggableItem[], documentId: string) => {
+  const response = await api.post('/documents/save', {
+    signData: JSON.stringify({ items }),
+    documentId
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to save document');
-  }
+  return response.data;
+};
 
-  return response.json();
+export const createDraftDocument = async (file: File) => {
+  const formData = new FormData();
+  formData.append('document', file);
+  
+  const response = await api.post('/documents/draft', formData);
+  return response.data;
 };
