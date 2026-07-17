@@ -13,25 +13,24 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const adminEmail = 'jeremy@pixby.id';
-  const adminPassword = await bcrypt.hash('Polmed123!', 10);
+  const adminPassword = await bcrypt.hash('Polmed123', 10);
 
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail }
+  const upsertAdmin = await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {
+      password_hash: adminPassword,
+      role: 'SUPER_ADMIN',
+    },
+    create: {
+      name: 'Super Admin',
+      email: adminEmail,
+      password_hash: adminPassword,
+      role: 'SUPER_ADMIN',
+    }
   });
 
-  if (!existingAdmin) {
-    await prisma.user.create({
-      data: {
-        name: 'Super Admin',
-        email: adminEmail,
-        password_hash: adminPassword,
-        role: 'SUPER_ADMIN',
-      }
-    });
-    console.log('✅ Default Super Admin created successfully!');
-  } else {
-    console.log('⚠️ Super Admin already exists.');
-  }
+  console.log('✅ Super Admin credentials have been forcefully set/updated!');
+  console.log('Email:', adminEmail);
 }
 
 main()
