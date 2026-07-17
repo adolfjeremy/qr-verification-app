@@ -165,7 +165,7 @@ export class DocumentController {
     if (!document || document.deletedAt) throw new BadRequestException('Document not found');
     if (document.uploaderId !== user.id) throw new BadRequestException('Unauthorized access to document');
     
-    const API_URL = process.env.API_URL || 'http://localhost:3000';
+    const API_URL = process.env.VITE_APP_URL || 'http://localhost:3000';
     return {
       ...document,
       fileViewUrl: `${API_URL}/api/documents/${id}/view`,
@@ -336,7 +336,7 @@ export class DocumentController {
     if (!request) throw new BadRequestException('Invalid or expired request link');
     if (request.status === 'COMPLETED') throw new BadRequestException('This document has already been signed');
 
-    const API_URL = process.env.API_URL || 'http://localhost:3000';
+    const API_URL = process.env.VITE_APP_URL || 'http://localhost:3000';
     return {
       id: request.id,
       documentId: request.documentId,
