@@ -6,4 +6,4 @@ uploads
 
 /generated/prisma
 dist
-/dist
+/dist*
