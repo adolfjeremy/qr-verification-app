@@ -74,7 +74,7 @@ export default function RegisterPage() {
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">Registration is Invite-Only</h2>
           <p className="text-slate-500 mb-6">
-            BAPP Enterprise Portal is currently not accepting public registrations. You must be invited by a Super Admin to create an account.
+            BAPP E-Signature is currently not accepting public registrations. You must be invited by a Super Admin to create an account.
           </p>
           <Link to="/login" className="inline-block bg-slate-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-slate-900 transition-colors">
             Go to Login

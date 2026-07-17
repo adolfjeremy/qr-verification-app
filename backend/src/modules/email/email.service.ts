@@ -20,7 +20,7 @@ export class EmailService {
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2563eb;">BAPP Enterprise Portal</h2>
+          <h2 style="color: #2563eb;">BAPP E-Signature</h2>
         </div>
         <p>Hello <strong>${toName}</strong>,</p>
         <p>You have been requested to sign the following document:</p>
@@ -73,7 +73,7 @@ export class EmailService {
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2563eb;">BAPP Enterprise Portal</h2>
+          <h2 style="color: #2563eb;">BAPP E-Signature</h2>
         </div>
         <p>Hello,</p>
         <p>We received a request to reset your password. If you didn't make this request, you can safely ignore this email.</p>
@@ -117,14 +117,14 @@ export class EmailService {
   }
 
   async sendInviteEmail(toEmail: string, inviteLink: string) {
-    const subject = `[BAPP E-Signature] You are invited to BAPP Enterprise Portal`;
+    const subject = `[BAPP E-Signature] You are invited to BAPP E-Signature`;
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #2563eb;">BAPP Enterprise Portal</h2>
+          <h2 style="color: #2563eb;">BAPP E-Signature</h2>
         </div>
         <p>Hello,</p>
-        <p>You have been invited by the Super Admin to join the BAPP Enterprise Portal.</p>
+        <p>You have been invited by the Super Admin to join BAPP E-Signature.</p>
         <p>Click the button below to register your account:</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${inviteLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accept Invite & Register</a>
