@@ -8,6 +8,16 @@ import { Request } from 'express';
 export class UserController {
   constructor(private readonly prismaService: PrismaService) {}
 
+  @Get()
+  async getAllUsers(@Req() req: Request) {
+    const user = req.user as any;
+    return await this.prismaService.user.findMany({
+      where: { id: { not: user.id } },
+      select: { id: true, email: true, name: true },
+      orderBy: { name: 'asc' }
+    });
+  }
+
   @Get('signatures')
   async getSavedSignatures(@Req() req: Request) {
     const user = req.user as any;

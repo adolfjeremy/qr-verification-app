@@ -20,6 +20,14 @@ let UserController = class UserController {
     constructor(prismaService) {
         this.prismaService = prismaService;
     }
+    async getAllUsers(req) {
+        const user = req.user;
+        return await this.prismaService.user.findMany({
+            where: { id: { not: user.id } },
+            select: { id: true, email: true, name: true },
+            orderBy: { name: 'asc' }
+        });
+    }
     async getSavedSignatures(req) {
         const user = req.user;
         return await this.prismaService.savedSignature.findMany({
@@ -50,6 +58,13 @@ let UserController = class UserController {
     }
 };
 exports.UserController = UserController;
+__decorate([
+    (0, common_1.Get)(),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UserController.prototype, "getAllUsers", null);
 __decorate([
     (0, common_1.Get)('signatures'),
     __param(0, (0, common_1.Req)()),

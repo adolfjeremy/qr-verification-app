@@ -3,6 +3,11 @@ import { Request } from 'express';
 export declare class UserController {
     private readonly prismaService;
     constructor(prismaService: PrismaService);
+    getAllUsers(req: Request): Promise<{
+        id: string;
+        email: string;
+        name: string;
+    }[]>;
     getSavedSignatures(req: Request): Promise<{
         id: string;
         createdAt: Date;

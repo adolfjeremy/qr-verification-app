@@ -368,6 +368,7 @@ export class DocumentController {
     ];
 
     // Combine with any existing items (like QR codes already placed by the owner)
+    // IMPORTANT: Remove the specific signature_request placeholder that is being fulfilled
     let existingItems = [];
     if (request.document.items) {
       if (typeof request.document.items === 'string') {
@@ -377,12 +378,15 @@ export class DocumentController {
       }
     }
     
-    const combinedItems = [...existingItems, ...itemsToSign];
+    const filteredExistingItems = existingItems.filter(item => {
+      // If we have an exact ID match, filter it out
+      if (coords.id && item.id === coords.id) return false;
+      // Fallback: filter out any signature_request at the exact same position
+      if (item.type === 'signature_request' && item.pageNumber === coords.pageNumber && item.x === coords.x && item.y === coords.y) return false;
+      return true;
+    });
 
-    const fileBuffer = await this.storageService.getFileBuffer(request.document.fileUrl);
-    const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, combinedItems);
-    
-    await this.storageService.uploadFile(request.document.fileUrl, signedPdfBuffer);
+    const combinedItems = [...filteredExistingItems, ...itemsToSign];
 
     // Mark request as completed
     await this.prismaService.signatureRequest.update({

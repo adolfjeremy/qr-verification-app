@@ -24,6 +24,8 @@ export default function SignDocumentPage() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestEmail, setRequestEmail] = useState('');
   const [requestName, setRequestName] = useState('');
+  const [registeredUsers, setRegisteredUsers] = useState<{id: string, name: string, email: string}[]>([]);
+  const [selectedUserType, setSelectedUserType] = useState<'custom'|'internal'>('custom');
   
   const [currentPage, setCurrentPage] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -59,6 +61,14 @@ export default function SignDocumentPage() {
       setItems([]);
     }
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (showRequestModal && registeredUsers.length === 0) {
+      api.get('/users').then(res => {
+        setRegisteredUsers(res.data);
+      }).catch(err => console.error('Failed to fetch users', err));
+    }
+  }, [showRequestModal, registeredUsers.length]);
 
   const handleFileUpload = async (f: File) => {
     try {
@@ -180,6 +190,8 @@ export default function SignDocumentPage() {
       setIsProcessing(true);
       await publishDocument(items, documentId);
       setIsSaved(true);
+      setDocumentStatus('PUBLISHED');
+      setPdfUrl(prev => prev ? `${prev.split('?')[0]}?t=${Date.now()}` : prev);
       toast.success('Document published successfully!');
     } catch (error) {
       console.error('Error publishing document', error);
@@ -196,8 +208,8 @@ export default function SignDocumentPage() {
 
     try {
       setIsProcessing(true);
-      // First save the current items just in case (like QR codes placed alongside the request)
-      await saveDocumentToServer(items.filter(i => i.type !== 'signature_request'), documentId);
+      // Save current items including the signature_request placeholder
+      await saveDocumentToServer(items, documentId);
       
       await api.post(`/documents/${documentId}/request-signature`, {
         email: requestItem.signerEmail,
@@ -208,6 +220,7 @@ export default function SignDocumentPage() {
           y: requestItem.y,
           width: requestItem.width,
           height: requestItem.height,
+          id: requestItem.id,
         })
       });
       setIsSaved(true);
@@ -416,12 +429,42 @@ export default function SignDocumentPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Select Registered User</label>
+                <select
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'custom') {
+                      setSelectedUserType('custom');
+                      setRequestName('');
+                      setRequestEmail('');
+                    } else {
+                      const user = registeredUsers.find(u => u.id === val);
+                      if (user) {
+                        setSelectedUserType('internal');
+                        setRequestName(user.name);
+                        setRequestEmail(user.email);
+                      }
+                    }
+                  }}
+                >
+                  <option value="custom">-- Custom / External User --</option>
+                  {registeredUsers.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Signer Name</label>
                 <input
                   type="text"
                   value={requestName}
+                  readOnly={selectedUserType === 'internal'}
                   onChange={(e) => setRequestName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${selectedUserType === 'internal' ? 'bg-slate-50 text-slate-500' : ''}`}
                   placeholder="e.g. John Doe"
                 />
               </div>
@@ -430,8 +473,9 @@ export default function SignDocumentPage() {
                 <input
                   type="email"
                   value={requestEmail}
+                  readOnly={selectedUserType === 'internal'}
                   onChange={(e) => setRequestEmail(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${selectedUserType === 'internal' ? 'bg-slate-50 text-slate-500' : ''}`}
                   placeholder="e.g. john@example.com"
                 />
               </div>

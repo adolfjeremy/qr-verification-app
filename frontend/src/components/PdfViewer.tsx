@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { ChevronLeft, ChevronRight, ZoomOut, ZoomIn } from 'lucide-react';
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
@@ -59,8 +60,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, onPageChange, onPage
           Next
         </button>
         <div className="hidden sm:block w-px h-6 bg-slate-300 mx-1" />
-        <button onClick={() => setScale(s => s - 0.2)} className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium hover:bg-slate-100 rounded-md">Zoom Out</button>
-        <button onClick={() => setScale(s => s + 0.2)} className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium hover:bg-slate-100 rounded-md">Zoom In</button>
+        <button onClick={() => setScale(s => s - 0.2)} className="px-2 py-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors" title="Zoom Out">
+          <ZoomOut className="w-5 h-5" />
+        </button>
+        <button onClick={() => setScale(s => s + 0.2)} className="px-2 py-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors" title="Zoom In">
+          <ZoomIn className="w-5 h-5" />
+        </button>
       </div>
 
       <div className="w-full overflow-auto flex justify-start sm:justify-center pb-4 hide-scrollbar">

@@ -282,10 +282,14 @@ let DocumentController = class DocumentController {
                 existingItems = request.document.items;
             }
         }
-        const combinedItems = [...existingItems, ...itemsToSign];
-        const fileBuffer = await this.storageService.getFileBuffer(request.document.fileUrl);
-        const signedPdfBuffer = await this.documentService.processDocument(fileBuffer, combinedItems);
-        await this.storageService.uploadFile(request.document.fileUrl, signedPdfBuffer);
+        const filteredExistingItems = existingItems.filter(item => {
+            if (coords.id && item.id === coords.id)
+                return false;
+            if (item.type === 'signature_request' && item.pageNumber === coords.pageNumber && item.x === coords.x && item.y === coords.y)
+                return false;
+            return true;
+        });
+        const combinedItems = [...filteredExistingItems, ...itemsToSign];
         await this.prismaService.signatureRequest.update({
             where: { id: request.id },
             data: { status: 'COMPLETED', completedAt: new Date() }
