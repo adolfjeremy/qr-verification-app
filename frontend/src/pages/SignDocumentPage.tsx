@@ -144,6 +144,14 @@ export default function SignDocumentPage() {
       toast.error('Email and Name are required');
       return;
     }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(requestEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     setItems([
       ...items,
       {
@@ -204,28 +212,40 @@ export default function SignDocumentPage() {
 
   const handleSendSignatureRequest = async () => {
     if (!documentId) return;
-    const requestItem = items.find(item => item.type === 'signature_request');
-    if (!requestItem) return;
+    const requestItems = items.filter(item => item.type === 'signature_request');
+    if (requestItems.length === 0) return;
 
     try {
       setIsProcessing(true);
-      // Save current items including the signature_request placeholder
+      // Save current items including the signature_request placeholders
       await saveDocumentToServer(items, documentId);
       
-      await api.post(`/documents/${documentId}/request-signature`, {
-        email: requestItem.signerEmail,
-        name: requestItem.signerName,
-        coordinateData: JSON.stringify({
-          pageNumber: requestItem.pageNumber,
-          x: requestItem.x,
-          y: requestItem.y,
-          width: requestItem.width,
-          height: requestItem.height,
-          id: requestItem.id,
-        })
-      });
+      let successCount = 0;
+      for (const requestItem of requestItems) {
+        try {
+          await api.post(`/documents/${documentId}/request-signature`, {
+            email: requestItem.signerEmail,
+            name: requestItem.signerName,
+            coordinateData: JSON.stringify({
+              pageNumber: requestItem.pageNumber,
+              x: requestItem.x,
+              y: requestItem.y,
+              width: requestItem.width,
+              height: requestItem.height,
+              id: requestItem.id,
+            })
+          });
+          successCount++;
+        } catch (e) {
+          console.error(`Error sending request to ${requestItem.signerEmail}`, e);
+          toast.error(`Failed to send request to ${requestItem.signerEmail}`);
+        }
+      }
+      
       setIsSaved(true);
-      toast.success(`Signature request sent to ${requestItem.signerEmail}`);
+      if (successCount > 0) {
+        toast.success(`Sent ${successCount} signature request(s)`);
+      }
     } catch (error) {
       console.error('Error sending request', error);
       toast.error('Failed to send signature request');

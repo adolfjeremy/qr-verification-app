@@ -11,6 +11,11 @@ interface VerifyData {
   signedDate: string;
   uploader: string;
   uploaderName?: string;
+  signers?: Array<{
+    name: string;
+    email: string;
+    completedAt: string;
+  }>;
 }
 
 export default function VerifySignaturePage() {
@@ -112,6 +117,27 @@ export default function VerifySignaturePage() {
               <p className="text-xs text-slate-500 mt-1">{data.uploader}</p>
             </div>
           </div>
+
+          {data.signers && data.signers.length > 0 && (
+            <div className="flex flex-col gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Ditandatangani Oleh</p>
+              {data.signers.map((signer, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                  <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold shrink-0">
+                    {signer.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="font-semibold text-slate-800 truncate">{signer.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{signer.email}</p>
+                  </div>
+                  <div className="text-xs text-slate-400 shrink-0 text-right">
+                    <p>Selesai</p>
+                    <p>{new Date(signer.completedAt).toLocaleDateString('id-ID')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600 shrink-0">

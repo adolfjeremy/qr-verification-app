@@ -175,6 +175,10 @@ let DocumentController = class DocumentController {
             where: { id },
             include: {
                 uploader: { select: { email: true, name: true } },
+                signatureRequests: {
+                    where: { status: 'COMPLETED' },
+                    select: { name: true, email: true, completedAt: true }
+                }
             }
         });
         if (!document) {
@@ -187,6 +191,7 @@ let DocumentController = class DocumentController {
             signedDate: document.updatedAt,
             uploader: document.uploader.email,
             uploaderName: document.uploader.name,
+            signers: document.signatureRequests
         };
     }
     async requestSignature(id, email, name, coordinateDataStr, req) {
@@ -221,7 +226,13 @@ let DocumentController = class DocumentController {
             data: { status: 'PENDING_SIGNATURE' }
         });
         const APP_URL = process.env.VITE_APP_URL || 'http://localhost:5173';
-        const signLink = `${APP_URL}/sign-request/${token}`;
+        const existingUser = await this.prismaService.user.findUnique({
+            where: { email }
+        });
+        const isInternal = !!existingUser;
+        const signLink = isInternal
+            ? `${APP_URL}/internal-sign-request/${token}`
+            : `${APP_URL}/sign-request/${token}`;
         await this.emailService.sendSignatureRequest(email, name, document.title, signLink);
         await this.auditService.logAction(id, 'SIGNATURE_REQUESTED', user.id, req.ip, req.headers['user-agent'], `Requested signature from ${email} (${name})`);
         return { message: 'Signature request sent successfully' };

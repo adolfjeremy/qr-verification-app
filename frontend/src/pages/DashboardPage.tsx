@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { FileText, LogOut, Plus, Calendar, Loader2, Trash2, ExternalLink, ShieldCheck } from 'lucide-react';
+import { FileText, LogOut, Plus, Calendar, Loader2, Trash2, ExternalLink, ShieldCheck, KeyRound, MailPlus } from 'lucide-react';
 import logoApp from '../assets/logo.webp';
+import ChangePasswordModal from '../components/ChangePasswordModal';
+import InviteUserModal from '../components/InviteUserModal';
 
 interface Document {
   id: string;
@@ -17,11 +19,16 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
   const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showInviteUser, setShowInviteUser] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState('USER');
+  const [currentUserName, setCurrentUserName] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const ITEMS_PER_PAGE = 10;
   const navigate = useNavigate();
 
   const getStatusStyles = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'DRAFT': return 'bg-slate-100 text-slate-700';
       case 'PENDING_SIGNATURE': return 'bg-amber-50 text-amber-700 animate-pulse';
       case 'SIGNED': return 'bg-sky-50 text-sky-700';
@@ -31,17 +38,22 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    const fetchDocuments = async () => {
+    const fetchDocumentsAndProfile = async () => {
       try {
-        const response = await api.get('/documents');
-        setDocuments(response.data);
+        const [docsRes, profileRes] = await Promise.all([
+          api.get('/documents'),
+          api.get('/auth/me')
+        ]);
+        setDocuments(docsRes.data);
+        setCurrentUserRole(profileRes.data.user.role);
+        setCurrentUserName(profileRes.data.user.name || profileRes.data.user.email);
       } catch (error) {
-        toast.error('Failed to load documents');
+        toast.error('Failed to load dashboard data');
       } finally {
         setIsLoading(false);
       }
     };
-    fetchDocuments();
+    fetchDocumentsAndProfile();
   }, []);
 
   const handleLogout = async () => {
@@ -81,24 +93,61 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-3">
             <img src={logoApp} alt="Logo" className="h-8 object-contain" />
-            <div className="hidden sm:block h-5 w-px bg-slate-200 mx-1"></div>
-            <span className="hidden sm:inline text-blue-500">BAPP Document Verification</span>
           </h1>
           <div className="flex items-center gap-4">
             <Link to="/" className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg text-white font-medium rounded-lg transition-all flex items-center gap-2">
               <Plus className="w-4 h-4" />
               <span>Upload Document</span>
             </Link>
+            
+            {currentUserRole === 'SUPER_ADMIN' && (
+              <>
+                <div className="h-4 w-px bg-slate-200"></div>
+                <Link to="/audit" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm font-medium">Audit Trail</span>
+                </Link>
+                <div className="h-4 w-px bg-slate-200"></div>
+                <button onClick={() => setShowInviteUser(true)} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors">
+                  <MailPlus className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm font-medium">Invite User</span>
+                </button>
+              </>
+            )}
+
             <div className="h-4 w-px bg-slate-200"></div>
-            <Link to="/audit" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors">
-              <ShieldCheck className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm font-medium">Audit Trail</span>
-            </Link>
-            <div className="h-4 w-px bg-slate-200"></div>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-slate-600 hover:text-red-600 transition-colors">
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">Logout</span>
-            </button>
+            
+            <div className="relative">
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {currentUserName ? currentUserName.charAt(0).toUpperCase() : 'U'}
+              </button>
+              
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl py-2 border border-slate-100 z-50">
+                  <div className="px-4 py-2 border-b border-slate-50 mb-2">
+                    <p className="text-sm font-medium text-slate-800 truncate">{currentUserName}</p>
+                    <p className="text-xs text-slate-500">{currentUserRole}</p>
+                  </div>
+                  <button 
+                    onClick={() => { setShowChangePassword(true); setIsDropdownOpen(false); }} 
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    Change Password
+                  </button>
+                  <button 
+                    onClick={() => { handleLogout(); setIsDropdownOpen(false); }} 
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -108,19 +157,19 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold text-slate-800">My Documents</h2>
           <div className="flex items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-lg">
-              <button 
+              <button
                 onClick={() => { setFilterStatus('ALL'); setCurrentPage(1); }}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterStatus === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 All
               </button>
-              <button 
+              <button
                 onClick={() => { setFilterStatus('PUBLISHED'); setCurrentPage(1); }}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterStatus === 'PUBLISHED' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Published
               </button>
-              <button 
+              <button
                 onClick={() => { setFilterStatus('DRAFT'); setCurrentPage(1); }}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filterStatus === 'DRAFT' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
@@ -148,7 +197,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No documents found</h3>
             <p className="text-slate-500 mb-8 max-w-md">
-              {filterStatus === 'ALL' 
+              {filterStatus === 'ALL'
                 ? "You haven't uploaded any documents yet. Get started by uploading your first document to verify and sign."
                 : `There are no documents matching the "${filterStatus}" status.`}
             </p>
@@ -163,124 +212,124 @@ export default function DashboardPage() {
               <ul className="space-y-3">
                 {filteredDocuments.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((doc) => (
                   <li key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 gap-4 sm:gap-0 bg-white hover:bg-slate-50 transition-all group hover:shadow-md hover:-translate-y-0.5 rounded-2xl border border-slate-200">
-                  <div className="flex items-start gap-4 w-full sm:w-auto">
-                    <div className="bg-blue-50 text-blue-600 p-3 rounded-lg">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-800">
-                        {doc.title}
-                      </p>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {new Date(doc.createdAt).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${getStatusStyles(doc.status)}`}>
-                          {doc.status}
-                        </span>
+                    <div className="flex items-start gap-4 w-full sm:w-auto">
+                      <div className="bg-blue-50 text-blue-600 p-3 rounded-lg">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {doc.title}
+                        </p>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {new Date(doc.createdAt).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${getStatusStyles(doc.status)}`}>
+                            {doc.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 mt-4 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity w-full sm:w-auto justify-end">
-                    <Link
-                      to={`/sign/${doc.id}`}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title={doc.status === 'DRAFT' ? "Edit Document" : "View / Export"}
-                    >
-                      <FileText className="w-5 h-5" />
-                    </Link>
-                    {doc.status !== 'DRAFT' && (
-                      <a
-                        href={`${API_URL}/documents/${doc.id}/view`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <div className="flex items-center gap-2 mt-4 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity w-full sm:w-auto justify-end">
+                      <Link
+                        to={`/sign/${doc.id}`}
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Open PDF"
+                        title={doc.status === 'DRAFT' ? "Edit Document" : "View / Export"}
                       >
-                        <ExternalLink className="w-5 h-5" />
-                      </a>
-                    )}
-                    <button
-                      onClick={() => handleDelete(doc.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete Document"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-xl shadow-sm">
-              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-slate-700">
-                    Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, filteredDocuments.length)}</span> of{' '}
-                    <span className="font-medium">{filteredDocuments.length}</span> results
-                  </p>
-                </div>
-                <div>
-                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="sr-only">Previous</span>
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    {Array.from({ length: totalPages }).map((_, idx) => (
+                        <FileText className="w-5 h-5" />
+                      </Link>
+                      {doc.status !== 'DRAFT' && (
+                        <a
+                          href={`${API_URL}/documents/${doc.id}/view`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Open PDF"
+                        >
+                          <ExternalLink className="w-5 h-5" />
+                        </a>
+                      )}
                       <button
-                        key={idx}
-                        onClick={() => setCurrentPage(idx + 1)}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-slate-300 focus:z-20 focus:outline-offset-0 ${currentPage === idx + 1 ? 'z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600' : 'text-slate-900 hover:bg-slate-50'}`}
+                        onClick={() => handleDelete(doc.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Document"
                       >
-                        {idx + 1}
+                        <Trash2 className="w-5 h-5" />
                       </button>
-                    ))}
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="sr-only">Next</span>
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </nav>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-xl shadow-sm">
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-700">
+                      Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, filteredDocuments.length)}</span> of{' '}
+                      <span className="font-medium">{filteredDocuments.length}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      {Array.from({ length: totalPages }).map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentPage(idx + 1)}
+                          className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-slate-300 focus:z-20 focus:outline-offset-0 ${currentPage === idx + 1 ? 'z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600' : 'text-slate-900 hover:bg-slate-50'}`}
+                        >
+                          {idx + 1}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Next</span>
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+
+                <div className="flex flex-1 justify-between sm:hidden">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
-              
-              <div className="flex flex-1 justify-between sm:hidden">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+            )}
           </div>
         )}
       </main>
@@ -297,7 +346,7 @@ export default function DashboardPage() {
               <p className="text-slate-500 mb-8">
                 Are you sure you want to delete this document? This action cannot be undone.
               </p>
-              
+
               <div className="flex flex-col gap-3">
                 <button
                   onClick={confirmDelete}
@@ -317,6 +366,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+      <InviteUserModal isOpen={showInviteUser} onClose={() => setShowInviteUser(false)} />
     </div>
   );
 }

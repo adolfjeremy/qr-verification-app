@@ -1,5 +1,5 @@
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, InviteUserDto } from './dto/auth.dto';
 import { Response } from 'express';
 export declare class AuthController {
     private readonly authService;
@@ -7,6 +7,7 @@ export declare class AuthController {
     register(registerDto: RegisterDto): Promise<{
         id: string;
         email: string;
+        role: string;
     }>;
     login(loginDto: LoginDto, res: Response): Promise<{
         user: {
@@ -21,4 +22,20 @@ export declare class AuthController {
     getProfile(req: any): {
         user: any;
     };
+    forgotPassword(dto: ForgotPasswordDto): Promise<{
+        message: string;
+    }>;
+    resetPassword(dto: ResetPasswordDto): Promise<{
+        message: string;
+    }>;
+    changePassword(req: any, dto: ChangePasswordDto): Promise<{
+        message: string;
+    }>;
+    inviteUser(req: any, dto: InviteUserDto): Promise<{
+        message: string;
+    }>;
+    verifyInvite(token: string): Promise<{
+        valid: boolean;
+        email: string;
+    }>;
 }

@@ -15,9 +15,9 @@ export declare class DocumentController {
     constructor(documentService: DocumentService, storageService: StorageService, prismaService: PrismaService, emailService: EmailService, cryptoService: CryptoService, auditService: AuditService);
     getUserDocuments(req: Request): Promise<{
         id: string;
-        createdAt: Date;
         title: string;
         status: string;
+        createdAt: Date;
     }[]>;
     publishDocument(signDataStr: string, documentId: string, req: Request): Promise<{
         message: string;
@@ -29,12 +29,12 @@ export declare class DocumentController {
     getDocumentDetails(id: string, req: Request): Promise<{
         fileViewUrl: string;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         title: string;
         status: string;
         fileUrl: string;
         items: import("@prisma/client/runtime/client").JsonValue | null;
+        createdAt: Date;
+        updatedAt: Date;
         deletedAt: Date | null;
         uploaderId: string;
     }>;
@@ -49,6 +49,11 @@ export declare class DocumentController {
         signedDate: Date;
         uploader: string;
         uploaderName: string;
+        signers: {
+            name: string;
+            email: string;
+            completedAt: Date;
+        }[];
     }>;
     requestSignature(id: string, email: string, name: string, coordinateDataStr: string, req: Request): Promise<{
         message: string;

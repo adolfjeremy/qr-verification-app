@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { ShieldCheck, Loader2 } from 'lucide-react';
@@ -7,15 +7,18 @@ import { ShieldCheck, Loader2 } from 'lucide-react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         await api.get('/auth/me');
-        navigate('/dashboard', { replace: true });
+        navigate(redirectUrl, { replace: true });
       } catch (error) {
         setIsCheckingAuth(false);
       }
@@ -27,9 +30,9 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await api.post('/auth/login', { email, password });
-      toast.success('Login successful!');
-      navigate('/dashboard');
+      await api.post('/auth/login', { email, password, rememberMe });
+      toast.success('Login successful');
+      navigate(redirectUrl);
     } catch (error) {
       toast.error('Invalid credentials. Please try again.');
     } finally {
@@ -68,7 +71,12 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <Link to="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
@@ -76,6 +84,20 @@ export default function LoginPage() {
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
               required
             />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="remember-me"
+              name="remember-me"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+            />
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700">
+              Remember me
+            </label>
           </div>
           
           <button

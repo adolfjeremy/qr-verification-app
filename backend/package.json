@@ -45,7 +45,8 @@
     "reflect-metadata": "^0.2.0",
     "resend": "^6.17.2",
     "rxjs": "^7.8.1",
-    "sharp": "^0.33.2"
+    "sharp": "^0.33.2",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -62,6 +63,7 @@
     "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.5",
     "@types/supertest": "^6.0.0",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "dotenv": "^17.4.2",

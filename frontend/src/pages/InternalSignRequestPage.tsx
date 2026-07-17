@@ -7,7 +7,7 @@ import { PdfViewer } from '../components/PdfViewer';
 import { SignaturePad } from '../components/SignaturePad';
 import logoApp from '../assets/logo.webp';
 
-export default function PublicSignPage() {
+export default function InternalSignRequestPage() {
   const { token } = useParams<{ token: string }>();
 
   const [documentData, setDocumentData] = useState<any>(null);
@@ -98,7 +98,7 @@ export default function PublicSignPage() {
           <div className="flex items-center gap-3">
             <img src={logoApp} alt="Logo" className="h-8 object-contain" />
             <div className="h-5 w-px bg-slate-200 mx-1"></div>
-            <span className="font-semibold text-slate-800 truncate max-w-[150px] sm:max-w-sm">Signature Request</span>
+            <span className="font-semibold text-slate-800 truncate max-w-[150px] sm:max-w-sm">Internal Signature Request</span>
           </div>
           
           <button
@@ -155,7 +155,6 @@ export default function PublicSignPage() {
         <SignaturePad
           onSave={handleSign}
           onClose={() => setShowSignaturePad(false)}
-          allowSavedSignatures={false}
         />
       )}
     </div>

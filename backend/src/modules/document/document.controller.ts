@@ -233,6 +233,10 @@ export class DocumentController {
       where: { id },
       include: {
         uploader: { select: { email: true, name: true } },
+        signatureRequests: {
+          where: { status: 'COMPLETED' },
+          select: { name: true, email: true, completedAt: true }
+        }
       }
     });
 
@@ -247,6 +251,7 @@ export class DocumentController {
       signedDate: document.updatedAt,
       uploader: document.uploader.email,
       uploaderName: document.uploader.name,
+      signers: document.signatureRequests
     };
   }
 
@@ -295,7 +300,16 @@ export class DocumentController {
     });
 
     const APP_URL = process.env.VITE_APP_URL || 'http://localhost:5173';
-    const signLink = `${APP_URL}/sign-request/${token}`;
+    
+    // Check if the requested email belongs to an internal user
+    const existingUser = await this.prismaService.user.findUnique({
+      where: { email }
+    });
+    const isInternal = !!existingUser;
+    
+    const signLink = isInternal 
+      ? `${APP_URL}/internal-sign-request/${token}` 
+      : `${APP_URL}/sign-request/${token}`;
 
     await this.emailService.sendSignatureRequest(email, name, document.title, signLink);
 

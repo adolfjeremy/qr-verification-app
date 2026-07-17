@@ -18,6 +18,7 @@ model User {
   signatures    Signature[]
   savedSignatures SavedSignature[]
   auditLogs     AuditLog[]
+  invites       UserInvite[]
 }
 
 model SavedSignature {
@@ -88,4 +89,23 @@ model AuditLog {
   createdAt   DateTime  @default(now())
   document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model UserInvite {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  token     String   @unique
+  status    String   @default("PENDING") // PENDING, ACCEPTED
+  invitedBy String
+  inviter   User     @relation(fields: [invitedBy], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

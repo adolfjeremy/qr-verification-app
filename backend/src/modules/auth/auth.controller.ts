@@ -1,7 +1,9 @@
-import { Controller, Post, Get, Body, Res, Req, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Res, Req, HttpCode, HttpStatus, UseGuards, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, InviteUserDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RolesGuard } from './roles.guard';
+import { Roles } from './roles.decorator';
 import { Response } from 'express';
 
 @Controller('api/auth')
@@ -22,7 +24,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      maxAge: loginDto.rememberMe ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 60 * 24, // 30 days or 1 day
     });
 
     return { user };
@@ -44,5 +46,33 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getProfile(@Req() req: any) {
     return { user: req.user };
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  async changePassword(@Req() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto);
+  }
+
+  @Post('invite')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  async inviteUser(@Req() req: any, @Body() dto: InviteUserDto) {
+    return this.authService.inviteUser(req.user.id, dto);
+  }
+
+  @Get('invite/:token')
+  async verifyInvite(@Param('token') token: string) {
+    return this.authService.validateInviteToken(token);
   }
 }

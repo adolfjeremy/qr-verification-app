@@ -8,9 +8,10 @@ import toast from 'react-hot-toast';
 interface SignaturePadProps {
   onSave: (base64: string) => void;
   onClose: () => void;
+  allowSavedSignatures?: boolean;
 }
 
-export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) => {
+export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose, allowSavedSignatures = true }) => {
   const padRef = useRef<SignatureCanvas>(null);
   const [isEmpty, setIsEmpty] = useState(true);
   const [activeTab, setActiveTab] = useState<'DRAW' | 'SAVED'>('DRAW');
@@ -89,20 +90,22 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
           </button>
         </div>
         
-        <div className="flex border-b shrink-0">
-          <button 
-            className={cn("flex-1 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'DRAW' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50")}
-            onClick={() => setActiveTab('DRAW')}
-          >
-            Draw New
-          </button>
-          <button 
-            className={cn("flex-1 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'SAVED' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50")}
-            onClick={() => setActiveTab('SAVED')}
-          >
-            Saved Signatures
-          </button>
-        </div>
+        {allowSavedSignatures && (
+          <div className="flex border-b shrink-0">
+            <button 
+              className={cn("flex-1 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'DRAW' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50")}
+              onClick={() => setActiveTab('DRAW')}
+            >
+              Draw New
+            </button>
+            <button 
+              className={cn("flex-1 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'SAVED' ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50")}
+              onClick={() => setActiveTab('SAVED')}
+            >
+              Saved Signatures
+            </button>
+          </div>
+        )}
 
         <div className="p-6 overflow-y-auto min-h-[300px]">
           {activeTab === 'DRAW' ? (
@@ -117,17 +120,19 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
                   onEnd={() => setIsEmpty(false)}
                 />
               </div>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 hover:text-slate-900">
-                <input 
-                  type="checkbox" 
-                  checked={saveForLater}
-                  onChange={(e) => setSaveForLater(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
-                />
-                Save this signature for future use
-              </label>
-            </div>
-          ) : (
+                {allowSavedSignatures && (
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 hover:text-slate-900">
+                    <input 
+                      type="checkbox" 
+                      checked={saveForLater}
+                      onChange={(e) => setSaveForLater(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+                    />
+                    Save this signature for future use
+                  </label>
+                )}
+              </div>
+            ) : (
             <div>
               {isLoading ? (
                 <div className="flex justify-center py-10">
