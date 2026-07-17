@@ -31,6 +31,7 @@ async function main() {
 
   console.log('✅ Super Admin credentials have been forcefully set/updated!');
   console.log('Email:', adminEmail);
+  console.log('Password:', adminPassword);
 }
 
 main()
