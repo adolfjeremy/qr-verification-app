@@ -23,7 +23,8 @@ export class AuthController {
     res.cookie('jwt', access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
+      path: '/',
       maxAge: loginDto.rememberMe ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 60 * 24, // 30 days or 1 day
     });
 
@@ -36,7 +37,8 @@ export class AuthController {
     res.cookie('jwt', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
+      path: '/',
       expires: new Date(0),
     });
     return { message: 'Logged out successfully' };
