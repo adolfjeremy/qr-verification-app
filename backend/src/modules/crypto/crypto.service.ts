@@ -10,7 +10,7 @@ export class CryptoService implements OnModuleInit {
   private readonly logger = new Logger(CryptoService.name);
   private p12Buffer: Buffer | null = null;
   private readonly certPath = path.join(process.cwd(), 'certificate.p12');
-  private readonly p12Password = 'bapp-enterprise-secure';
+  private readonly p12Password = 'bapp-esignature-secure';
 
   onModuleInit() {
     this.ensureCertificateExists();
@@ -81,7 +81,7 @@ export class CryptoService implements OnModuleInit {
 
       pdflibAddPlaceholder({
         pdfDoc,
-        reason: 'Digitally Verified by BAPP Enterprise',
+        reason: 'Digitally Verified by BAPP E-Signature',
         contactInfo: process.env.BAPP_AUTHORITY_EMAIL || '',
         name: 'BAPP Authority',
         location: 'Jakarta, ID'

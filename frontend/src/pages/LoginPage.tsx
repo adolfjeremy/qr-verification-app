@@ -56,7 +56,7 @@ export default function LoginPage() {
             <ShieldCheck className="w-6 h-6 text-blue-600" />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Sign In</h1>
-          <p className="text-slate-500 text-sm mt-1">Access your enterprise document portal</p>
+          <p className="text-slate-500 text-sm mt-1">Access your BAPP E-Signature portal</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

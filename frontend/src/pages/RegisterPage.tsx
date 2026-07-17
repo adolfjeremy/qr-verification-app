@@ -92,7 +92,7 @@ export default function RegisterPage() {
             <ShieldCheck className="w-6 h-6 text-blue-600" />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Complete Registration</h1>
-          <p className="text-slate-500 text-sm mt-1 text-center">You have been invited to join the enterprise portal.</p>
+          <p className="text-slate-500 text-sm mt-1 text-center">You have been invited to join the BAPP E-Signature portal.</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
