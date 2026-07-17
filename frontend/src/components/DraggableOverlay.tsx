@@ -48,6 +48,8 @@ export const DraggableOverlay: React.FC<DraggableOverlayProps> = ({ item, onChan
         });
       }}
       bounds="parent"
+      dragGrid={[10 * scale, 10 * scale]}
+      resizeGrid={[10 * scale, 10 * scale]}
       disableDragging={disabled}
       enableResizing={!disabled}
       className={`absolute ${!disabled ? 'group border-2 border-dashed border-blue-500 bg-blue-500/10 cursor-move' : ''}`}

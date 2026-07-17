@@ -18,6 +18,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
   const [isLoading, setIsLoading] = useState(false);
   const [saveForLater, setSaveForLater] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteSigId, setDeleteSigId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'SAVED') {
@@ -60,26 +61,22 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
     }
   };
 
-  const handleDeleteSaved = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteSaved = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium">Delete this saved signature?</span>
-        <div className="flex gap-2 justify-end">
-          <button autoFocus onClick={() => toast.dismiss(t.id)} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm text-slate-700 transition-colors">Cancel</button>
-          <button onClick={async () => {
-            toast.dismiss(t.id);
-            try {
-              await api.delete(`/users/signatures/${id}`);
-              setSavedSignatures(prev => prev.filter(s => s.id !== id));
-              toast.success('Signature deleted');
-            } catch(err) {
-              toast.error('Failed to delete signature');
-            }
-          }} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">Delete</button>
-        </div>
-      </div>
-    ), { duration: 5000, position: 'top-center' });
+    setDeleteSigId(id);
+  };
+
+  const confirmDeleteSig = async () => {
+    if (!deleteSigId) return;
+    try {
+      await api.delete(`/users/signatures/${deleteSigId}`);
+      setSavedSignatures(prev => prev.filter(s => s.id !== deleteSigId));
+      toast.success('Signature deleted');
+    } catch(err) {
+      toast.error('Failed to delete signature');
+    } finally {
+      setDeleteSigId(null);
+    }
   };
 
   return (
@@ -189,6 +186,39 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClose }) =
           </div>
         )}
       </div>
+
+      {/* Premium Delete Modal for Signature */}
+      {deleteSigId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Delete Signature?</h3>
+              <p className="text-slate-500 mb-8">
+                Are you sure you want to delete this saved signature? You won't be able to use it again.
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={confirmDeleteSig}
+                  className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors w-full shadow-md hover:shadow-lg"
+                >
+                  Yes, Delete it
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => setDeleteSigId(null)}
+                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors w-full"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

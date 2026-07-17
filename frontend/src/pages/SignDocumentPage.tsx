@@ -22,6 +22,7 @@ export default function SignDocumentPage() {
   const [items, setItems] = useState<DraggableItem[]>([]);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [requestEmail, setRequestEmail] = useState('');
   const [requestName, setRequestName] = useState('');
   const [registeredUsers, setRegisteredUsers] = useState<{id: string, name: string, email: string}[]>([]);
@@ -261,7 +262,7 @@ export default function SignDocumentPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm h-16 flex items-center">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-40 shadow-sm h-16 flex items-center">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -274,10 +275,10 @@ export default function SignDocumentPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wider 
-              ${documentStatus === 'PUBLISHED' ? 'bg-purple-100 text-purple-700' : 
-                documentStatus === 'SIGNED' ? 'bg-emerald-100 text-emerald-700' : 
-                documentStatus === 'SIGNATURE_REQUESTED' ? 'bg-orange-100 text-orange-700' : 
+            <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider shadow-sm border border-black/5
+              ${documentStatus === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700' : 
+                documentStatus === 'SIGNED' ? 'bg-sky-50 text-sky-700' : 
+                (documentStatus === 'SIGNATURE_REQUESTED' || documentStatus === 'PENDING_SIGNATURE') ? 'bg-amber-50 text-amber-700 animate-pulse' : 
                 'bg-slate-100 text-slate-600'}`}>
               {documentStatus.replace('_', ' ')}
             </span>
@@ -340,52 +341,7 @@ export default function SignDocumentPage() {
               </div>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-2 w-full sm:w-auto pt-2 border-t border-slate-100 sm:pt-0 sm:border-t-0 shrink-0">
-                {!isSaved ? (
-                  <>
-                    <button
-                      onClick={handleSaveDocument}
-                      disabled={isProcessing}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-70 disabled:cursor-not-allowed text-slate-700 text-sm font-medium rounded-lg transition-colors"
-                    >
-                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
-                      <span className="hidden sm:inline">Save Draft</span>
-                      <span className="sm:hidden">Save</span>
-                    </button>
-                    
-                    {items.some(i => i.type === 'signature_request') ? (
-                      <button
-                        onClick={handleSendSignatureRequest}
-                        disabled={isProcessing}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                      >
-                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
-                        <span className="hidden sm:inline">Send Request</span>
-                        <span className="sm:hidden">Send</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handlePublish}
-                        disabled={isProcessing}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-                      >
-                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
-                        <span className="hidden sm:inline">Publish</span>
-                        <span className="sm:hidden">Publish</span>
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    onClick={handleExport}
-                    disabled={isProcessing}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 text-white text-sm font-medium rounded-xl transition-colors shadow-md"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
-                    <span>Export PDF</span>
-                  </button>
-                )}
-              </div>
+              {/* Removed original action buttons from here to move to FAB */}
             </div>
 
             <div className="w-full" ref={containerRef}>
@@ -493,6 +449,91 @@ export default function SignDocumentPage() {
               >
                 Add Placeholder
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Bar (FAB) */}
+      {pdfUrl && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <div className="bg-white/80 backdrop-blur-xl border border-slate-200/50 shadow-2xl rounded-2xl p-2 flex items-center gap-2">
+            {!isSaved ? (
+              <>
+                <button
+                  onClick={handleSaveDocument}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-3 bg-slate-100/80 hover:bg-slate-200 disabled:opacity-70 disabled:cursor-not-allowed text-slate-700 text-sm font-semibold rounded-xl transition-all"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Save className="h-4 w-4 shrink-0" />}
+                  <span className="hidden sm:inline">Save Draft</span>
+                </button>
+                
+                {items.some(i => i.type === 'signature_request') ? (
+                  <button
+                    onClick={handleSendSignatureRequest}
+                    disabled={isProcessing}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
+                    <span>Send Request</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowPublishModal(true)}
+                    disabled={isProcessing}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Send className="h-4 w-4 shrink-0" />}
+                    <span>Publish Document</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={handleExport}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-8 py-3 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 text-white text-sm font-semibold rounded-xl transition-all shadow-lg hover:-translate-y-0.5"
+              >
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
+                <span>Export Final PDF</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Publish Confirmation Modal */}
+      {showPublishModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Send className="w-10 h-10 text-blue-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Publish Document?</h3>
+              <p className="text-slate-500 mb-6">
+                This action will permanently lock the document and bake all signatures and QR codes into the PDF. <strong>You will not be able to edit their positions after this.</strong>
+              </p>
+              
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowPublishModal(false)}
+                  className="px-6 py-3 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition-colors w-full"
+                >
+                  Go Back
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => {
+                    setShowPublishModal(false);
+                    handlePublish();
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 w-full"
+                >
+                  Yes, Publish Now
+                </button>
+              </div>
             </div>
           </div>
         </div>

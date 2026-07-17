@@ -16,8 +16,19 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 10;
   const navigate = useNavigate();
+
+  const getStatusStyles = (status: string) => {
+    switch(status) {
+      case 'DRAFT': return 'bg-slate-100 text-slate-700';
+      case 'PENDING_SIGNATURE': return 'bg-amber-50 text-amber-700 animate-pulse';
+      case 'SIGNED': return 'bg-sky-50 text-sky-700';
+      case 'PUBLISHED': return 'bg-emerald-50 text-emerald-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
+  };
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -42,34 +53,31 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium">Are you sure you want to delete this document?</span>
-        <div className="flex gap-2 justify-end">
-          <button autoFocus onClick={() => toast.dismiss(t.id)} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm text-slate-700 transition-colors">Cancel</button>
-          <button onClick={async () => {
-            toast.dismiss(t.id);
-            try {
-              await api.delete(`/documents/${id}`);
-              setDocuments(docs => docs.filter(doc => doc.id !== id));
-              toast.success('Document deleted successfully');
-            } catch (error) {
-              toast.error('Failed to delete document');
-            }
-          }} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">Delete</button>
-        </div>
-      </div>
-    ), { duration: 5000, position: 'top-center' });
+  const handleDelete = (id: string) => {
+    setDeleteDocId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteDocId) return;
+    try {
+      await api.delete(`/documents/${deleteDocId}`);
+      setDocuments(docs => docs.filter(doc => doc.id !== deleteDocId));
+      toast.success('Document deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete document');
+    } finally {
+      setDeleteDocId(null);
+    }
   };
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   const filteredDocuments = documents.filter(doc => filterStatus === 'ALL' || doc.status === filterStatus);
+  const totalPages = Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE);
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-3">
             <img src={logoApp} alt="Logo" className="h-8 object-contain" />
@@ -77,6 +85,11 @@ export default function DashboardPage() {
             <span className="hidden sm:inline text-blue-500">BAPP Document Verification</span>
           </h1>
           <div className="flex items-center gap-4">
+            <Link to="/" className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg text-white font-medium rounded-lg transition-all flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              <span>Upload Document</span>
+            </Link>
+            <div className="h-4 w-px bg-slate-200"></div>
             <Link to="/audit" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors">
               <ShieldCheck className="w-4 h-4" />
               <span className="hidden sm:inline text-sm font-medium">Audit Trail</span>
@@ -114,7 +127,7 @@ export default function DashboardPage() {
                 Draft
               </button>
             </div>
-            <Link to="/" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm whitespace-nowrap">
+            <Link to="/" className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg whitespace-nowrap border border-transparent">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New Document</span>
             </Link>
@@ -126,19 +139,30 @@ export default function DashboardPage() {
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
           </div>
         ) : filteredDocuments.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <FileText className="w-8 h-8 text-slate-400" />
+          <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center text-center shadow-sm">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 transform scale-150"></div>
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-full flex items-center justify-center relative z-10 shadow-sm">
+                <FileText className="w-10 h-10 text-blue-500" />
+              </div>
             </div>
-            <h3 className="text-lg font-semibold text-slate-800">No documents found</h3>
-            <p className="text-slate-500 mt-1 max-w-sm">There are no documents matching your selected filter.</p>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No documents found</h3>
+            <p className="text-slate-500 mb-8 max-w-md">
+              {filterStatus === 'ALL' 
+                ? "You haven't uploaded any documents yet. Get started by uploading your first document to verify and sign."
+                : `There are no documents matching the "${filterStatus}" status.`}
+            </p>
+            <Link to="/" className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+              <Plus className="w-5 h-5" />
+              <span>Upload Document Now</span>
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <ul className="divide-y divide-slate-100">
+            <div className="bg-transparent overflow-hidden">
+              <ul className="space-y-3">
                 {filteredDocuments.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((doc) => (
-                  <li key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 sm:gap-0 hover:bg-slate-50 transition-colors group">
+                  <li key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 gap-4 sm:gap-0 bg-white hover:bg-slate-50 transition-all group hover:shadow-md hover:-translate-y-0.5 rounded-2xl border border-slate-200">
                   <div className="flex items-start gap-4 w-full sm:w-auto">
                     <div className="bg-blue-50 text-blue-600 p-3 rounded-lg">
                       <FileText className="w-6 h-6" />
@@ -156,7 +180,7 @@ export default function DashboardPage() {
                             year: 'numeric'
                           })}
                         </span>
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${getStatusStyles(doc.status)}`}>
                           {doc.status}
                         </span>
                       </div>
@@ -195,12 +219,13 @@ export default function DashboardPage() {
             </ul>
           </div>
           
-          {filteredDocuments.length > ITEMS_PER_PAGE && (
-            <div className="flex items-center justify-between bg-white px-4 py-3 border border-slate-200 rounded-xl sm:px-6">
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-xl shadow-sm">
               <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm text-slate-700">
-                    Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, filteredDocuments.length)}</span> of <span className="font-medium">{filteredDocuments.length}</span> results
+                    Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, filteredDocuments.length)}</span> of{' '}
+                    <span className="font-medium">{filteredDocuments.length}</span> results
                   </p>
                 </div>
                 <div>
@@ -215,18 +240,18 @@ export default function DashboardPage() {
                         <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
                       </svg>
                     </button>
-                    {Array.from({ length: Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE) }).map((_, idx) => (
+                    {Array.from({ length: totalPages }).map((_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setCurrentPage(idx + 1)}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-slate-300 focus:z-20 focus:outline-offset-0 ${currentPage === idx + 1 ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600' : 'text-slate-900 hover:bg-slate-50'}`}
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-slate-300 focus:z-20 focus:outline-offset-0 ${currentPage === idx + 1 ? 'z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600' : 'text-slate-900 hover:bg-slate-50'}`}
                       >
                         {idx + 1}
                       </button>
                     ))}
                     <button
-                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE), p + 1))}
-                      disabled={currentPage === Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE)}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
                       className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="sr-only">Next</span>
@@ -247,8 +272,8 @@ export default function DashboardPage() {
                   Previous
                 </button>
                 <button
-                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE), p + 1))}
-                  disabled={currentPage === Math.ceil(filteredDocuments.length / ITEMS_PER_PAGE)}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
                   className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Next
@@ -259,6 +284,39 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Premium Delete Modal */}
+      {deleteDocId && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Delete Document?</h3>
+              <p className="text-slate-500 mb-8">
+                Are you sure you want to delete this document? This action cannot be undone.
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={confirmDelete}
+                  className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors w-full shadow-md hover:shadow-lg"
+                >
+                  Yes, Delete it
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => setDeleteDocId(null)}
+                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors w-full"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
