@@ -12,7 +12,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const userCount = await this.prisma.user.count();
@@ -44,7 +44,7 @@ export class AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerDto.email },
     });
-    
+
     if (existingUser) {
       throw new BadRequestException('User with this email already exists');
     }
@@ -91,7 +91,7 @@ export class AuthService {
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
-    
+
     return {
       access_token: this.jwtService.sign(payload),
       user: { id: user.id, email: user.email, role: user.role },
@@ -168,7 +168,7 @@ export class AuthService {
 
     const existingInvite = await this.prisma.userInvite.findUnique({ where: { email: dto.email } });
     if (existingInvite) {
-       await this.prisma.userInvite.delete({ where: { email: dto.email } });
+      await this.prisma.userInvite.delete({ where: { email: dto.email } });
     }
 
     await this.prisma.userInvite.create({
@@ -180,7 +180,7 @@ export class AuthService {
       },
     });
 
-    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?invite=${token}`;
+    const inviteLink = `${process.env.VITE_APP_URL || 'http://localhost:5173'}/register?invite=${token}`;
     await this.emailService.sendInviteEmail(dto.email, inviteLink);
 
     return { message: 'Invitation sent successfully.' };

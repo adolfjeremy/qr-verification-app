@@ -8,14 +8,14 @@ import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
+
   app.use(helmet());
   app.use(cookieParser());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
-  
+
   app.enableCors({
-    origin: process.env.VITE_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.VITE_APP_URL || 'http://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
