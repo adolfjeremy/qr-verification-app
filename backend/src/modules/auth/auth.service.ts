@@ -111,7 +111,7 @@ export class AuthService {
       data: { email: dto.email, token, expiresAt },
     });
 
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    const resetLink = `${process.env.VITE_APP_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
     await this.emailService.sendPasswordResetEmail(dto.email, resetLink);
 
     return { message: 'If an account with that email exists, we sent a password reset link.' };
