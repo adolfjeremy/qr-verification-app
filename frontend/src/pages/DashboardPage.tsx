@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { FileText, LogOut, Plus, Calendar, Loader2, Trash2, ExternalLink, ShieldCheck, KeyRound, MailPlus } from 'lucide-react';
+import { FileText, LogOut, Plus, Calendar, Loader2, Trash2, ExternalLink, ShieldCheck, KeyRound, MailPlus, Users } from 'lucide-react';
 import logoApp from '../assets/logo.webp';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import InviteUserModal from '../components/InviteUserModal';
@@ -100,12 +100,17 @@ export default function DashboardPage() {
               <span>Upload Document</span>
             </Link>
             
-            {currentUserRole === 'SUPER_ADMIN' && (
+            {(currentUserRole === 'SUPER_ADMIN' || currentUserRole === 'ADMIN') && (
               <>
                 <div className="h-4 w-px bg-slate-200"></div>
                 <Link to="/audit" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors">
                   <ShieldCheck className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm font-medium">Audit Trail</span>
+                </Link>
+                <div className="h-4 w-px bg-slate-200"></div>
+                <Link to="/users" className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors">
+                  <Users className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm font-medium">Manage Users</span>
                 </Link>
                 <div className="h-4 w-px bg-slate-200"></div>
                 <button onClick={() => setShowInviteUser(true)} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 transition-colors">

@@ -68,7 +68,7 @@ export class AuthController {
 
   @Post('invite')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN')
   async inviteUser(@Req() req: any, @Body() dto: InviteUserDto) {
     return this.authService.inviteUser(req.user.id, dto);
   }

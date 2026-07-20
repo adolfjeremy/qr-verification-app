@@ -12,6 +12,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import RegisterPage from './pages/RegisterPage';
 import InternalSignRequestPage from './pages/InternalSignRequestPage';
+import UserManagementPage from './pages/UserManagementPage';
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
           <Route path="/sign/:id" element={<SignDocumentPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/audit" element={<DocumentAuditPage />} />
+          <Route path="/users" element={<UserManagementPage />} />
           <Route path="/internal-sign-request/:token" element={<InternalSignRequestPage />} />
         </Route>
         </Routes>

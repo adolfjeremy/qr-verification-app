@@ -11,10 +11,10 @@ export class AuditController {
   @Get()
   async getAllLogs(@Req() req: Request) {
     const user = req.user as any;
-    if (user.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Only SUPER_ADMIN can view all audit logs');
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only SUPER_ADMIN and ADMIN can view audit logs');
     }
-    return this.auditService.getAllLogs();
+    return this.auditService.getAllLogs(user.role);
   }
 
   @Get('document/:id')

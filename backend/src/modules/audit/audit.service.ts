@@ -35,11 +35,21 @@ export class AuditService {
     });
   }
 
-  async getAllLogs() {
+  async getAllLogs(requesterRole: string = 'SUPER_ADMIN') {
+    const whereClause: any = {};
+    
+    if (requesterRole === 'ADMIN') {
+      whereClause.OR = [
+        { user: { role: { not: 'SUPER_ADMIN' } } },
+        { userId: null }
+      ];
+    }
+
     return this.prisma.auditLog.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, role: true } },
         document: { select: { title: true } }
       }
     });
