@@ -76,9 +76,10 @@ export default function SignDocumentPage() {
       setIsProcessing(true);
       const res = await createDraftDocument(f);
       navigate(`/sign/${res.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating draft', error);
-      toast.error('Failed to upload document');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to upload document';
+      toast.error(`Upload failed: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }

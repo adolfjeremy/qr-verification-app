@@ -116,6 +116,7 @@ export class DocumentController {
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({ fileType: 'pdf' })
+        .addMaxSizeValidator({ maxSize: 50 * 1024 * 1024, message: 'File is too large. Maximum size is 50MB' })
         .build({ errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY }),
     ) file: Express.Multer.File,
     @Req() req: Request,
